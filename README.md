@@ -50,6 +50,8 @@ La Jetson Nano no garantiza Wi-Fi integrado en todos los kits; se debe validar u
 ├── config/                  # Configuración no secreta de desarrollo
 ├── deploy/jetson/           # Criterios de despliegue para la Jetson
 ├── docs/                    # Decisiones de arquitectura y protocolo
+├── firmware/                # Código que se compila y flashea al ESP32-C3
+│   └── esp32c3_motor_controller/
 ├── services/
 │   ├── arduino_bridge/      # Protocolo serial hacia Arduino
 │   ├── learning_agent/      # Estado pedagógico y comportamiento offline
@@ -59,6 +61,8 @@ La Jetson Nano no garantiza Wi-Fi integrado en todos los kits; se debe validar u
 ├── .env.example             # Variables de entorno de referencia
 └── docker-compose.dev.yml   # Broker local para desarrollo en PC
 ```
+
+El firmware se abre desde Arduino IDE seleccionando la carpeta `firmware/esp32c3_motor_controller/`. No se ejecuta dentro de Docker ni de la Jetson.
 
 ## Desarrollo local, por ahora
 
