@@ -1,29 +1,51 @@
-# ESP32-C3 motor controller
+# ESP32-C3 + TB6612FNG
 
-Firmware para el ESP32-C3 SuperMini que controlará el driver TB6612FNG y los dos motores DC del robot.
+Sketch Arduino para probar los dos motores DC del robot. Se abre directamente con Arduino IDE mediante `esp32c3_motor_controller.ino`.
 
-## Abrir en Arduino IDE
+## Conexiones definidas
 
-1. Abrir `esp32c3_motor_controller.ino` desde esta carpeta.
-2. Instalar el paquete de placas ESP32 de Espressif si aún no está instalado.
-3. Elegir la placa ESP32-C3 que corresponda al SuperMini y el puerto USB correcto.
-4. Por seguridad, conservar `MOTOR_OUTPUTS_ENABLED` en `false` hasta validar el cableado.
-
-## Contrato inicial con la Jetson
-
-El futuro servicio `services/arduino_bridge` se conectará por USB serial a 115200 baudios.
-
-| Jetson -> ESP32 | Respuesta | Propósito |
+| ESP32-C3 SuperMini | TB6612FNG | Función |
 | --- | --- | --- |
-| `PING` | `PONG mimix-esp32c3` | Verificar enlace. |
-| `HEARTBEAT` | `ACK HEARTBEAT` | Mantener habilitado el controlador. |
-| `STOP` | `ACK STOP` | Detener inmediatamente los motores. |
+| GPIO 3 | PWMA | Velocidad del motor A (izquierdo). |
+| GPIO 4 | AIN1 | Dirección motor A. |
+| GPIO 5 | AIN2 | Dirección motor A. |
+| GPIO 1 | STBY | Habilita el TB6612FNG. |
+| GPIO 6 | BIN1 | Dirección motor B (derecho). |
+| GPIO 7 | BIN2 | Dirección motor B. |
+| GPIO 10 | PWMB | Velocidad del motor B. |
+| 3V3 | VCC | Alimentación lógica del TB6612FNG. |
+| GND | GND | Tierra común. |
+| Batería/fuente de motores | VM | Alimentación de los motores. |
 
-El firmware no acepta todavía comandos de movimiento. Antes de agregarlos hay que definir los GPIO reales, alimentación de motores, tierra común, sentido de cada motor, velocidad máxima y comportamiento ante fallo.
+Los motores se conectan a `A01/A02` y `B01/B02` del TB6612FNG.
 
-## Seguridad eléctrica mínima
+## Pines que quedan libres
 
-- Alimentar los motores desde una fuente independiente y apropiada para ellos.
-- Unir la tierra de la fuente de motores, TB6612FNG, ESP32 y Jetson.
-- Mantener el pin `STBY` del TB6612FNG en estado seguro durante el arranque.
-- Probar con las ruedas elevadas antes de poner el robot en el suelo.
+| Pines | Reserva |
+| --- | --- |
+| GPIO 8 / GPIO 9 | I2C: SDA / SCL. |
+| GPIO 20 / GPIO 21 | UART: RX / TX para una futura comunicación con la Jetson. |
+| GPIO 0 / GPIO 2 | Sin usar. GPIO 2 es un pin de arranque, por eso no se conecta al driver. |
+
+El ESP32-C3 considera GPIO 2, 8 y 9 como pines de arranque; 8 y 9 quedan además reservados para I2C. [Documentación de Espressif](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/peripherals/gpio.html)
+
+## Prueba automática
+
+Al reiniciar, el sketch espera tres segundos y realiza una sola vez:
+
+1. Adelante durante un segundo.
+2. Quieto durante un segundo.
+3. Atrás durante un segundo.
+4. Quieto durante un segundo.
+5. Izquierda durante un segundo.
+6. Quieto durante un segundo.
+7. Derecha durante un segundo y queda detenido.
+
+Si adelante o atrás se invierten, intercambiar los dos cables del motor afectado en el TB6612FNG, o invertir los valores `HIGH`/`LOW` de ese motor en el sketch.
+
+## Seguridad eléctrica
+
+- La fuente de motores va a `VM`; no alimentar motores desde el pin 3V3 del ESP32.
+- Usar 3V3 en `VCC` para que la lógica del TB6612FNG sea compatible con las señales de 3.3 V del ESP32.
+- Unir GND de ESP32, TB6612FNG y la fuente de motores.
+- Probar con las ruedas elevadas antes de colocar el robot en el suelo.
