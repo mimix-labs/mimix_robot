@@ -1,0 +1,9 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: mimix-robot-mqtt-dev
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
