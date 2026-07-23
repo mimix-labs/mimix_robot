@@ -64,6 +64,10 @@ La Jetson Nano no garantiza Wi-Fi integrado en todos los kits; se debe validar u
 
 El firmware se abre desde Arduino IDE seleccionando la carpeta `firmware/esp32c3_motor_controller/`. No se ejecuta dentro de Docker ni de la Jetson.
 
+`services/vision/` es un proceso nativo opcional para la Jetson: procesa la
+camara y entrega landmarks a Mimix Web. No forma parte del control de motores
+ni transmite video por MQTT. Ver [services/vision/README.md](services/vision/README.md).
+
 ## Desarrollo local, por ahora
 
 1. Copiar `.env.example` a `.env` y ajustar solo valores locales.
