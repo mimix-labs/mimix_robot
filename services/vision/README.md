@@ -46,10 +46,12 @@ http://localhost:5173/challenges/mathematics/index.html?vision=robot
 http://localhost:5173/challenges/science/index.html?vision=robot
 ```
 
-En este modo el navegador no solicita `getUserMedia`; por eso el fondo de la
-camara queda oculto. Los puntos cian y los gestos confirman la comunicacion.
-El streaming de video es una fase independiente (WebRTC o MJPEG) y no bloquea
-el control por manos.
+En este modo el navegador no solicita `getUserMedia`: recibe el video MJPEG
+del mismo proceso nativo que detecta la mano. Los puntos cian se dibujan sobre
+esa imagen y los gestos siguen llegando por el canal de landmarks.
+
+El video se sirve solo dentro de la Jetson en `127.0.0.1:8081` y Mimix Web lo
+reenvia por `/api/vision/video`; no expone un puerto adicional a la red.
 
 ## Camara USB y CSI
 

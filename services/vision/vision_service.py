@@ -12,6 +12,8 @@ import os
 import signal
 import time
 from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Condition, Thread
 from typing import Any
 
 import cv2
@@ -35,6 +37,10 @@ class Settings:
     height: int
     fps: float
     camera_pipeline: str | None
+    video_bind_host: str
+    video_port: int
+    video_fps: float
+    video_jpeg_quality: int
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -48,6 +54,10 @@ class Settings:
             height=int(os.getenv("MIMIX_CAMERA_HEIGHT", "480")),
             fps=float(os.getenv("MIMIX_VISION_FPS", "15")),
             camera_pipeline=os.getenv("MIMIX_CAMERA_PIPELINE") or None,
+            video_bind_host=os.getenv("MIMIX_VIDEO_BIND_HOST", "127.0.0.1"),
+            video_port=int(os.getenv("MIMIX_VIDEO_PORT", "8081")),
+            video_fps=float(os.getenv("MIMIX_VIDEO_FPS", "10")),
+            video_jpeg_quality=int(os.getenv("MIMIX_VIDEO_JPEG_QUALITY", "70")),
         )
 
 
@@ -74,6 +84,71 @@ def open_camera(settings: Settings) -> cv2.VideoCapture:
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.height)
     camera.set(cv2.CAP_PROP_FPS, settings.fps)
     return camera
+
+
+class LatestJpegFrame:
+    """Conserva el JPEG mas reciente para los navegadores conectados."""
+
+    def __init__(self) -> None:
+        self._condition = Condition()
+        self._frame: bytes | None = None
+        self._version = 0
+
+    def publish(self, frame: bytes) -> None:
+        with self._condition:
+            self._frame = frame
+            self._version += 1
+            self._condition.notify_all()
+
+    def wait_for_next(self, previous_version: int) -> tuple[bytes | None, int]:
+        with self._condition:
+            self._condition.wait_for(
+                lambda: self._version != previous_version or not RUNNING,
+                timeout=2,
+            )
+            return self._frame, self._version
+
+
+def create_video_server(frame_store: LatestJpegFrame, settings: Settings) -> ThreadingHTTPServer:
+    class MjpegHandler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+            if self.path != "/stream.mjpg":
+                self.send_error(404, "Use /stream.mjpg")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.end_headers()
+
+            version = 0
+            try:
+                while RUNNING:
+                    frame, version = frame_store.wait_for_next(version)
+                    if frame is None:
+                        continue
+                    self.wfile.write(b"--frame\r\n")
+                    self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                    self.wfile.write(f"Content-Length: {len(frame)}\r\n\r\n".encode())
+                    self.wfile.write(frame)
+                    self.wfile.write(b"\r\n")
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def log_message(self, _format: str, *_args: Any) -> None:
+            return
+
+    server = ThreadingHTTPServer((settings.video_bind_host, settings.video_port), MjpegHandler)
+    Thread(target=server.serve_forever, name="mimix-mjpeg", daemon=True).start()
+    LOGGER.info(
+        "Video MJPEG disponible en http://%s:%s/stream.mjpg",
+        settings.video_bind_host,
+        settings.video_port,
+    )
+    return server
 
 
 def hand_payload(results: Any) -> dict[str, Any]:
@@ -117,9 +192,13 @@ def publish(session: requests.Session, api_url: str, payload: dict[str, Any]) ->
 def run() -> None:
     settings = Settings.from_environment()
     frame_interval = 1 / max(settings.fps, 1)
+    video_interval = 1 / max(settings.video_fps, 1)
     camera = open_camera(settings)
     session = requests.Session()
     hands_api = mp.solutions.hands
+    frame_store = LatestJpegFrame()
+    video_server = create_video_server(frame_store, settings)
+    last_video_frame_at = 0.0
 
     LOGGER.info(
         "Vision iniciada (%sx%s a %.1f FPS) -> %s",
@@ -150,10 +229,23 @@ def run() -> None:
                 results = hands.process(rgb_frame)
                 publish(session, settings.api_url, hand_payload(results))
 
+                now = time.monotonic()
+                if now - last_video_frame_at >= video_interval:
+                    encoded, jpeg_frame = cv2.imencode(
+                        ".jpg",
+                        frame,
+                        [cv2.IMWRITE_JPEG_QUALITY, settings.video_jpeg_quality],
+                    )
+                    if encoded:
+                        frame_store.publish(jpeg_frame.tobytes())
+                    last_video_frame_at = now
+
                 remaining = frame_interval - (time.monotonic() - started_at)
                 if remaining > 0:
                     time.sleep(remaining)
     finally:
+        video_server.shutdown()
+        video_server.server_close()
         session.close()
         camera.release()
         LOGGER.info("Vision detenida; camara liberada")
