@@ -39,7 +39,14 @@ cd ~/mimix_web
 npm run client
 ```
 
-Abrir el reto agregando `?vision=robot` a la URL que muestre Vite:
+Para entrar desde el mundo 3D de Mimix, abrir:
+
+```text
+http://localhost:5173/?vision=robot
+```
+
+Las zonas de MatemÃ¡ticas y Ciencias conservan automÃ¡ticamente `vision=robot`.
+Si se necesita ir a un reto para depurar, tambiÃ©n se puede abrir directamente:
 
 ```text
 http://localhost:5173/challenges/mathematics/index.html?vision=robot
@@ -52,6 +59,10 @@ esa imagen y los gestos siguen llegando por el canal de landmarks.
 
 El video se sirve solo dentro de la Jetson en `127.0.0.1:8081` y Mimix Web lo
 reenvia por `/api/vision/video`; no expone un puerto adicional a la red.
+
+Por defecto se transmite a 15 FPS con JPEG calidad 60 y la cÃ¡mara usa un
+buffer de un frame para reducir latencia. Se puede bajar el uso de CPU con
+`MIMIX_VIDEO_FPS=10` o mejorar la imagen con `MIMIX_VIDEO_JPEG_QUALITY=70`.
 
 ## Camara USB y CSI
 

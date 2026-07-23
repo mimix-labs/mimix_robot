@@ -56,8 +56,8 @@ class Settings:
             camera_pipeline=os.getenv("MIMIX_CAMERA_PIPELINE") or None,
             video_bind_host=os.getenv("MIMIX_VIDEO_BIND_HOST", "127.0.0.1"),
             video_port=int(os.getenv("MIMIX_VIDEO_PORT", "8081")),
-            video_fps=float(os.getenv("MIMIX_VIDEO_FPS", "10")),
-            video_jpeg_quality=int(os.getenv("MIMIX_VIDEO_JPEG_QUALITY", "70")),
+            video_fps=float(os.getenv("MIMIX_VIDEO_FPS", "15")),
+            video_jpeg_quality=int(os.getenv("MIMIX_VIDEO_JPEG_QUALITY", "60")),
         )
 
 
@@ -83,6 +83,7 @@ def open_camera(settings: Settings) -> cv2.VideoCapture:
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, settings.width)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.height)
     camera.set(cv2.CAP_PROP_FPS, settings.fps)
+    camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     return camera
 
 
@@ -224,11 +225,6 @@ def run() -> None:
                     time.sleep(0.2)
                     continue
 
-                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                rgb_frame.flags.writeable = False
-                results = hands.process(rgb_frame)
-                publish(session, settings.api_url, hand_payload(results))
-
                 now = time.monotonic()
                 if now - last_video_frame_at >= video_interval:
                     encoded, jpeg_frame = cv2.imencode(
@@ -239,6 +235,11 @@ def run() -> None:
                     if encoded:
                         frame_store.publish(jpeg_frame.tobytes())
                     last_video_frame_at = now
+
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgb_frame.flags.writeable = False
+                results = hands.process(rgb_frame)
+                publish(session, settings.api_url, hand_payload(results))
 
                 remaining = frame_interval - (time.monotonic() - started_at)
                 if remaining > 0:
