@@ -62,6 +62,8 @@ MIMIX_ELEVENLABS_AGENT_ID=agent_xxx
 ELEVENLABS_API_KEY=tu_clave_privada
 MIMIX_WEB_URL=http://127.0.0.1:4000
 MIMIX_ROBOT_BRIDGE_TOKEN=un_secreto_local_largo
+MIMIX_AUDIO_INPUT_SOURCE=alsa_input.usb-...
+MIMIX_AUDIO_OUTPUT_SINK=bluez_output....
 ```
 
 Si defines `MIMIX_ROBOT_BRIDGE_TOKEN`, coloca exactamente el mismo valor en
@@ -69,7 +71,23 @@ Si defines `MIMIX_ROBOT_BRIDGE_TOKEN`, coloca exactamente el mismo valor en
 primer piloto aislado puedes omitirlo en ambos proyectos, pero no en una red
 compartida.
 
-Luego carga las variables e inicia el servicio:
+En la Jetson, usa los nombres exactos que muestran estos comandos para las dos
+variables de audio:
+
+```bash
+pactl list short sources
+pactl list short sinks
+```
+
+Luego inicia el servicio con un único comando. El lanzador carga `.env`,
+selecciona los dispositivos configurados y arranca Wall-E:
+
+```bash
+cd ~/mimix_robot
+bash services/speech_service/start_walle.sh
+```
+
+Para diagnóstico manual, también puedes cargar las variables e iniciarlo así:
 
 ```bash
 cd ~/mimix_robot
