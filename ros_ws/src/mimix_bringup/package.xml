@@ -6,7 +6,6 @@
   <maintainer email="edwarfin24@gmail.com">Mimix Labs</maintainer>
   <license>MIT</license>
 
-  <buildtool_depend>ament_python</buildtool_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>mimix_runtime</exec_depend>
