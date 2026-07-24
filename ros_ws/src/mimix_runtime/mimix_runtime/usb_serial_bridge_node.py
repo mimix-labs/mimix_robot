@@ -1,5 +1,6 @@
 """Único punto ROS 2 que escribe el protocolo serial del ESP32-C3."""
 
+import json
 import time
 
 import rclpy
@@ -10,6 +11,14 @@ from .common import status
 
 
 class UsbSerialBridge(Node):
+    SERVO_LIMITS = {
+        'servo_1': (1, 180, 320),
+        'servo_2': (2, 400, 480),
+        'servo_3': (3, 180, 600),
+        'servo_4': (4, 150, 300),
+        'servo_5': (5, 150, 400),
+    }
+
     def __init__(self):
         super().__init__('mimix_usb_serial_bridge')
         self.declare_parameter('port', '')
@@ -86,6 +95,23 @@ class UsbSerialBridge(Node):
         action = request.action.lower()
         if action == 'stop':
             return 'STOP'
+
+        if action == 'base_pose':
+            return 'BASE'
+
+        if action in self.SERVO_LIMITS:
+            try:
+                payload = json.loads(request.payload_json or '{}')
+                pulse = int(payload['pulse'])
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ValueError('Un servo requiere payload_json con {"pulse": numero}.') from error
+
+            servo_number, minimum, maximum = self.SERVO_LIMITS[action]
+            if pulse < minimum or pulse > maximum:
+                raise ValueError(
+                    f'{action} admite pulsos entre {minimum} y {maximum}; se recibio {pulse}.'
+                )
+            return f'SERVO {servo_number} {pulse}'
 
         directions = {
             'forward': 'FORWARD',

@@ -72,7 +72,8 @@ ls -l /dev/serial/by-id/
 ## Primera prueba física de tracción
 
 1. Sube el firmware `firmware/esp32c3_motor_controller` al ESP32-C3. Debe
-   imprimir `READY MIMIX_MOTOR_V2` y permanecer detenido.
+   imprimir `READY MIMIX_ROBOT_V3`, dejar los motores detenidos y llevar los
+   servos a su posición base.
    En Arduino IDE, si aparece esa opción, selecciona **USB CDC On Boot:
    Enabled** para que `Serial` se exponga por el USB-C.
 2. Eleva las ruedas del suelo y conecta el ESP32 a un USB anfitrión de la
@@ -101,3 +102,21 @@ Para detenerlo inmediatamente, incluso si el filtro está desarmado:
 ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest \
   "{id: 'emergency-stop', action: 'stop', max_duration_ms: 100, payload_json: '{}'}"
 ```
+
+## Prueba individual de servos
+
+Con ROS iniciado en modo físico y el robot armado, primero devuelve todos los
+servos a la posición base:
+
+```bash
+ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "{id: 'servos-base', action: 'base_pose', max_duration_ms: 100, payload_json: '{}'}"
+```
+
+Después prueba **un solo servo por vez**. Por ejemplo, el servo 3 centrado:
+
+```bash
+ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "{id: 'servo-3-center', action: 'servo_3', max_duration_ms: 100, payload_json: '{\"pulse\": 375}'}"
+```
+
+Las acciones válidas son `servo_1` a `servo_5`. Los rangos permitidos son los
+calibrados en el firmware; ROS y el ESP32 rechazan un valor fuera de rango.
