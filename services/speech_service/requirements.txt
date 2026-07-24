@@ -1,0 +1,2 @@
+elevenlabs[pyaudio]>=2.58,<3
+requests>=2.31,<3
