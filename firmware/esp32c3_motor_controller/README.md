@@ -8,7 +8,7 @@ del puente H. Al arrancar, deja los cuatro pines en bajo y no mueve el robot.
 
 | ESP32-C3 SuperMini | Puente H | Función |
 | --- | --- | --- |
-| GPIO 4 | IN1 | Dirección motor A. |
+| GPIO 3 | IN1 | Dirección motor A. |
 | GPIO 5 | IN2 | Dirección motor A. |
 | GPIO 6 | IN3 | Dirección motor B. |
 | GPIO 7 | IN4 | Dirección motor B. |

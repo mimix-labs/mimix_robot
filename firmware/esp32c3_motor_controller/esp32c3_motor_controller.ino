@@ -15,7 +15,7 @@
 #include <stdio.h>
 
 // Entradas de dirección del puente H.
-const int IN1 = 4;  // Motor A
+const int IN1 = 3;  // Motor A
 const int IN2 = 5;
 const int IN3 = 6;  // Motor B (derecho)
 const int IN4 = 7;
