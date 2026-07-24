@@ -2,6 +2,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -39,14 +40,18 @@ def generate_launch_description():
             package='mimix_runtime',
             executable='safety',
             name='safety',
-            parameters=[{'armed': armed}],
+            parameters=[{'armed': ParameterValue(armed, value_type=bool)}],
         ),
         Node(
             package='mimix_runtime',
             executable='usb_serial_bridge',
             name='usb_serial_bridge',
             parameters=[
-                {'port': serial_port, 'baud': serial_baud, 'dry_run': dry_run},
+                {
+                    'port': serial_port,
+                    'baud': ParameterValue(serial_baud, value_type=int),
+                    'dry_run': ParameterValue(dry_run, value_type=bool),
+                },
             ],
         ),
     ])
