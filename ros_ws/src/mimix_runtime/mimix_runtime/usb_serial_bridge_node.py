@@ -32,11 +32,13 @@ class UsbSerialBridge(Node):
         self.connect()
 
     def connect(self):
+        self.close_serial()
+
         if not self.port:
             self.status_publisher.publish(status(
                 'usb_serial_bridge', 'blocked', 'Falta serial_port; no se abre ningún puerto.',
             ))
-            return
+            return False
 
         try:
             import serial
@@ -57,9 +59,22 @@ class UsbSerialBridge(Node):
             self.status_publisher.publish(status(
                 'usb_serial_bridge', 'connected', f'{self.port}: {response or "sin respuesta inicial"}',
             ))
+            return True
         except (ImportError, OSError, ValueError) as error:
-            self.serial_connection = None
+            self.get_logger().error(f'No se pudo abrir el puerto serial: {error}')
+            self.close_serial()
             self.status_publisher.publish(status('usb_serial_bridge', 'error', str(error)))
+            return False
+
+    def close_serial(self):
+        if not self.serial_connection:
+            return
+        try:
+            self.serial_connection.close()
+        except OSError:
+            pass
+        finally:
+            self.serial_connection = None
 
     def send_line(self, command):
         if not self.serial_connection:
@@ -94,6 +109,8 @@ class UsbSerialBridge(Node):
 
         try:
             command = self.motion_command(request)
+            if not self.serial_connection and not self.connect():
+                raise OSError('Puerto serial no conectado.')
             self.send_line(command)
             response = self.serial_connection.readline().decode('utf-8', errors='replace').strip()
             self.status_publisher.publish(status(
@@ -101,15 +118,21 @@ class UsbSerialBridge(Node):
             ))
         except (OSError, ValueError) as error:
             self.get_logger().error(f'No se pudo enviar movimiento: {error}')
-            self.status_publisher.publish(status('usb_serial_bridge', 'error', str(error)))
+            # No reenviamos un movimiento tras un fallo: podría haberse recibido
+            # parcialmente. Solo recuperamos el puerto y el usuario decide repetirlo.
+            reconnected = self.connect()
+            state = 'reconnected_reissue_command' if reconnected else 'error'
+            detail = 'Puerto recuperado; vuelve a enviar la orden.' if reconnected else str(error)
+            self.status_publisher.publish(status('usb_serial_bridge', state, detail))
 
     def destroy_node(self):
         if self.serial_connection:
             try:
                 self.send_line('STOP')
-                self.serial_connection.close()
             except OSError:
                 pass
+            finally:
+                self.close_serial()
         return super().destroy_node()
 
 
