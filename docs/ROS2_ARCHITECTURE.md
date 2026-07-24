@@ -15,7 +15,7 @@ flowchart LR
   Behavior -->|navegación| WB
   Behavior -->|solicitud simbólica| Safety[safety]
   Safety -->|solo armado| USB[usb_serial_bridge]
-  USB -. MIMIX_MOTOR_V1 .-> ESP[ESP32-C3 por USB]
+  USB -. MIMIX_MOTOR_V2 .-> ESP[ESP32-C3 por USB]
 ```
 
 ## Contratos
@@ -36,8 +36,8 @@ flowchart LR
   USB, aunque se le pase una ruta.
 - La salida real exige las tres condiciones: `dry_run=false`, un `serial_port`
   explícito y el armado manual del nodo `safety`.
-- El firmware `MIMIX_MOTOR_V1` solo acepta `PING`, `STOP` y comandos `MOVE`
-  acotados a las cuatro direcciones, 3 segundos y velocidad 180.
+- El firmware `MIMIX_MOTOR_V2` solo acepta `PING`, `STOP` y comandos `MOVE`
+  acotados a las cuatro direcciones y 3 segundos. La primera etapa no usa PWM.
 - La futura ruta USB debe ser `/dev/serial/by-id/...`, no un nombre cambiante
   como `/dev/ttyACM0`.
 

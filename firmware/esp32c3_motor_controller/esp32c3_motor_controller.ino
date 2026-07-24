@@ -1,33 +1,29 @@
 /*
-  Mimix Robot - controlador de traccion por USB serial
-  Placa: ESP32-C3 SuperMini
-  Driver: TB6612FNG
+  Mimix Robot - traccion por USB serial
+  ESP32-C3 SuperMini + puente H de cuatro entradas
 
-  Protocolo de una linea a 115200 baudios:
+  Comandos desde la Jetson:
     PING
     STOP
-    MOVE FORWARD|BACKWARD|LEFT|RIGHT <duracion_ms> <velocidad>
+    MOVE FORWARD|BACKWARD|LEFT|RIGHT <duracion_ms>
 
-  El robot inicia detenido. Toda orden invalida detiene los motores.
+  El puente H se usa con sus habilitaciones activas (por ejemplo, jumpers
+  ENA/ENB). Este firmware solo controla las cuatro entradas de direccion.
 */
 
 #include <string.h>
 #include <stdio.h>
 
-// TB6612FNG: motor A izquierdo, motor B derecho.
-const int PWMA = 3;
-const int IN1 = 4;
+// Entradas de dirección del puente H.
+const int IN1 = 4;  // Motor A
 const int IN2 = 5;
-const int STBY = 1;
-const int IN3 = 6;
+const int IN3 = 6;  // Motor B (derecho)
 const int IN4 = 7;
-const int PWMB = 10;
 
-// Reservados para sensores/servos futuros; no se usan en esta etapa.
+// Reservados para sensores futuros; no se usan para motores.
 const int SDA_I2C = 8;
 const int SCL_I2C = 9;
 
-const int MAX_SPEED = 180;              // Protege el driver y la primera prueba.
 const unsigned long MAX_DURATION_MS = 3000;
 const size_t COMMAND_BUFFER_SIZE = 64;
 
@@ -37,20 +33,14 @@ bool motionActive = false;
 unsigned long motionDeadline = 0;
 
 void stopMotors() {
-  analogWrite(PWMA, 0);
-  analogWrite(PWMB, 0);
-
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
-  digitalWrite(STBY, LOW);
   motionActive = false;
 }
 
-void applyMotion(const char* direction, int speed) {
-  digitalWrite(STBY, HIGH);
-
+bool applyMotion(const char* direction) {
   if (strcmp(direction, "FORWARD") == 0) {
     digitalWrite(IN1, HIGH);
     digitalWrite(IN2, LOW);
@@ -73,11 +63,10 @@ void applyMotion(const char* direction, int speed) {
     digitalWrite(IN4, HIGH);
   } else {
     stopMotors();
-    return;
+    return false;
   }
 
-  analogWrite(PWMA, speed);
-  analogWrite(PWMB, speed);
+  return true;
 }
 
 void processCommand(char* command) {
@@ -94,26 +83,18 @@ void processCommand(char* command) {
 
   char direction[10] = {0};
   long durationMs = 0;
-  int speed = 0;
-  if (sscanf(command, "MOVE %9s %ld %d", direction, &durationMs, &speed) != 3) {
+  if (sscanf(command, "MOVE %9s %ld", direction, &durationMs) != 2) {
     stopMotors();
     Serial.println("ERR INVALID_COMMAND");
     return;
   }
 
-  const bool validDirection =
-    strcmp(direction, "FORWARD") == 0 ||
-    strcmp(direction, "BACKWARD") == 0 ||
-    strcmp(direction, "LEFT") == 0 ||
-    strcmp(direction, "RIGHT") == 0;
-
-  if (!validDirection || durationMs <= 0 || durationMs > MAX_DURATION_MS || speed <= 0 || speed > MAX_SPEED) {
+  if (durationMs <= 0 || durationMs > MAX_DURATION_MS || !applyMotion(direction)) {
     stopMotors();
     Serial.println("ERR OUT_OF_RANGE");
     return;
   }
 
-  applyMotion(direction, speed);
   motionActive = true;
   motionDeadline = millis() + static_cast<unsigned long>(durationMs);
   Serial.print("OK MOVE ");
@@ -150,16 +131,13 @@ void readSerialCommands() {
 void setup() {
   Serial.begin(115200);
 
-  pinMode(PWMA, OUTPUT);
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
-  pinMode(STBY, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
-  pinMode(PWMB, OUTPUT);
 
   stopMotors();
-  Serial.println("READY MIMIX_MOTOR_V1");
+  Serial.println("READY MIMIX_MOTOR_V2");
 }
 
 void loop() {

@@ -72,7 +72,7 @@ ls -l /dev/serial/by-id/
 ## Primera prueba física de tracción
 
 1. Sube el firmware `firmware/esp32c3_motor_controller` al ESP32-C3. Debe
-   imprimir `READY MIMIX_MOTOR_V1` y permanecer detenido.
+   imprimir `READY MIMIX_MOTOR_V2` y permanecer detenido.
    En Arduino IDE, si aparece esa opción, selecciona **USB CDC On Boot:
    Enabled** para que `Serial` se exponga por el USB-C.
 2. Eleva las ruedas del suelo y conecta el ESP32 a un USB anfitrión de la
@@ -92,7 +92,7 @@ source /opt/ros/jazzy/setup.bash
 source ~/mimix_robot/ros_ws/install/setup.bash
 ros2 service call /mimix/safety/arm std_srvs/srv/SetBool "{data: true}"
 ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest \
-  "{id: 'motor-test-1', action: 'forward', max_duration_ms: 500, payload_json: '{\"speed\":80}'}"
+  "{id: 'motor-test-1', action: 'forward', max_duration_ms: 500, payload_json: '{}'}"
 ```
 
 Para detenerlo inmediatamente, incluso si el filtro está desarmado:

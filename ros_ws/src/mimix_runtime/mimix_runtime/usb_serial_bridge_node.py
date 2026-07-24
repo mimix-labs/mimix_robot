@@ -1,6 +1,5 @@
 """Único punto ROS 2 que escribe el protocolo serial del ESP32-C3."""
 
-import json
 import time
 
 import rclpy
@@ -82,15 +81,8 @@ class UsbSerialBridge(Node):
         if action not in directions:
             raise ValueError(f'Acción no admitida por el firmware: {request.action}')
 
-        try:
-            payload = json.loads(request.payload_json or '{}')
-            speed = int(payload.get('speed', 80))
-        except (ValueError, TypeError, json.JSONDecodeError) as error:
-            raise ValueError(f'payload_json inválido: {error}') from error
-
-        speed = min(max(speed, 1), 180)
         duration = min(max(int(request.max_duration_ms), 100), 3000)
-        return f'MOVE {directions[action]} {duration} {speed}'
+        return f'MOVE {directions[action]} {duration}'
 
     def on_motion(self, request):
         if self.dry_run:
