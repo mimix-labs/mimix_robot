@@ -21,8 +21,7 @@ Face Landmarker, Object Detector u otra fuente, identificando `source` y
 `modality`; ROS no queda atado a las manos.
 
 El puente USB inicia siempre con `dry_run:=true` y el filtro de seguridad con
-`armed:=false`. En este estado no se escribe nada al ESP32. La definición del
-protocolo de firmware será una etapa posterior.
+`armed:=false`. En este estado no se escribe nada al ESP32.
 
 ## Instalar en Jetson (Ubuntu 24.04)
 
@@ -30,7 +29,7 @@ Instala ROS 2 Jazzy para Ubuntu 24.04 siguiendo la documentación oficial de
 ROS y añade las dependencias del workspace:
 
 ```bash
-sudo apt install ros-jazzy-ros-base python3-colcon-common-extensions python3-rosdep python3-serial
+sudo apt install ros-jazzy-ros-base ros-dev-tools python3-serial
 sudo rosdep init
 rosdep update
 ```
@@ -70,5 +69,35 @@ Jetson, se identificará primero su ruta estable con:
 ls -l /dev/serial/by-id/
 ```
 
-No pases esa ruta al launch ni desactives `dry_run` hasta definir y cargar el
-protocolo del firmware.
+## Primera prueba física de tracción
+
+1. Sube el firmware `firmware/esp32c3_motor_controller` al ESP32-C3. Debe
+   imprimir `READY MIMIX_MOTOR_V1` y permanecer detenido.
+   En Arduino IDE, si aparece esa opción, selecciona **USB CDC On Boot:
+   Enabled** para que `Serial` se exponga por el USB-C.
+2. Eleva las ruedas del suelo y conecta el ESP32 a un USB anfitrión de la
+   Jetson. Identifica su ruta con el comando anterior.
+3. Inicia ROS indicando explícitamente la ruta estable:
+
+```bash
+ros2 launch mimix_bringup robot.launch.py \
+  serial_port:=/dev/serial/by-id/REEMPLAZAR \
+  dry_run:=false
+```
+
+4. En una segunda terminal, arma el movimiento y envía una prueba corta:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/mimix_robot/ros_ws/install/setup.bash
+ros2 service call /mimix/safety/arm std_srvs/srv/SetBool "{data: true}"
+ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest \
+  "{id: 'motor-test-1', action: 'forward', max_duration_ms: 500, payload_json: '{\"speed\":80}'}"
+```
+
+Para detenerlo inmediatamente, incluso si el filtro está desarmado:
+
+```bash
+ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest \
+  "{id: 'emergency-stop', action: 'stop', max_duration_ms: 100, payload_json: '{}'}"
+```

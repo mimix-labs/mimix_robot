@@ -1,6 +1,8 @@
 # ESP32-C3 + TB6612FNG
 
-Sketch Arduino para probar los dos motores DC del robot. Se abre directamente con Arduino IDE mediante `esp32c3_motor_controller.ino`.
+Firmware de tracción de Mimix. El ESP32-C3 se conecta por USB-C a la Jetson y
+solo acepta comandos seriales delimitados por salto de línea a 115200 baudios.
+Al arrancar deja los motores detenidos; no hay prueba automática.
 
 ## Conexiones definidas
 
@@ -17,35 +19,37 @@ Sketch Arduino para probar los dos motores DC del robot. Se abre directamente co
 | GND | GND | Tierra común. |
 | Batería/fuente de motores | VM | Alimentación de los motores. |
 
-Los motores se conectan a `A01/A02` y `B01/B02` del TB6612FNG.
+Los motores se conectan a `A01/A02` y `B01/B02` del TB6612FNG. GPIO 8 y 9 se
+reservan para I2C y no intervienen en este firmware.
 
-## Pines que quedan libres
+## Protocolo `MIMIX_MOTOR_V1`
 
-| Pines | Reserva |
-| --- | --- |
-| GPIO 8 / GPIO 9 | I2C: SDA / SCL. |
-| GPIO 20 / GPIO 21 | UART: RX / TX para una futura comunicación con la Jetson. |
-| GPIO 0 / GPIO 2 | Sin usar. GPIO 2 es un pin de arranque, por eso no se conecta al driver. |
+| Orden | Respuesta | Efecto |
+| --- | --- | --- |
+| `PING` | `PONG` | Comprueba la conexión. |
+| `STOP` | `OK STOP` | Detiene inmediatamente ambos motores. |
+| `MOVE FORWARD 500 80` | `OK MOVE FORWARD` | Mueve en la dirección indicada. |
 
-El ESP32-C3 considera GPIO 2, 8 y 9 como pines de arranque; 8 y 9 quedan además reservados para I2C. [Documentación de Espressif](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/peripherals/gpio.html)
+Las direcciones aceptadas son `FORWARD`, `BACKWARD`, `LEFT` y `RIGHT`.
+La duración debe estar entre 1 y 3000 ms; la velocidad entre 1 y 180. Al
+cumplirse el tiempo, el firmware detiene los motores automáticamente y emite
+`EVENT MOTION_TIMEOUT STOP`. Cualquier orden inválida también detiene motores.
 
-## Prueba automática
+## Carga y prueba
 
-Al reiniciar, el sketch espera tres segundos y realiza una sola vez:
+1. En Arduino IDE selecciona la placa ESP32-C3 correcta y el puerto USB.
+2. Si el menú lo ofrece, activa **USB CDC On Boot**.
+3. Carga `esp32c3_motor_controller.ino`.
+4. Abre el monitor serial a 115200; al reiniciar debe aparecer
+   `READY MIMIX_MOTOR_V1` y no debe moverse el robot.
 
-1. Adelante durante un segundo.
-2. Quieto durante un segundo.
-3. Atrás durante un segundo.
-4. Quieto durante un segundo.
-5. Izquierda durante un segundo.
-6. Quieto durante un segundo.
-7. Derecha durante un segundo y queda detenido.
-
-Si adelante o atrás se invierten, intercambiar los dos cables del motor afectado en el TB6612FNG, o invertir los valores `HIGH`/`LOW` de ese motor en el sketch.
+La primera orden física debe enviarse desde ROS, no desde el monitor serial;
+el procedimiento está en [`ros_ws/README.md`](../../ros_ws/README.md).
 
 ## Seguridad eléctrica
 
-- La fuente de motores va a `VM`; no alimentar motores desde el pin 3V3 del ESP32.
-- Usar 3V3 en `VCC` para que la lógica del TB6612FNG sea compatible con las señales de 3.3 V del ESP32.
+- La fuente de motores va a `VM`; nunca alimentar motores desde el pin 3V3
+  del ESP32.
+- Usar 3V3 en `VCC` para lógica compatible con el ESP32.
 - Unir GND de ESP32, TB6612FNG y la fuente de motores.
 - Probar con las ruedas elevadas antes de colocar el robot en el suelo.

@@ -31,6 +31,11 @@ class SafetyNode(Node):
         return response
 
     def on_request(self, request):
+        if request.action.lower() == 'stop':
+            self.approved_publisher.publish(request)
+            self.status_publisher.publish(status('safety', 'emergency_stop', request.id))
+            return
+
         if not self.armed:
             self.status_publisher.publish(status('safety', 'blocked', f'{request.action}: robot desarmado'))
             return

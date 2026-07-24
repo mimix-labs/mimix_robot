@@ -1,149 +1,172 @@
 /*
-  Mimix Robot - prueba de motores
+  Mimix Robot - controlador de traccion por USB serial
   Placa: ESP32-C3 SuperMini
   Driver: TB6612FNG
 
-  Al encender, el robot hace UNA sola secuencia:
-  adelante -> quieto -> atras -> quieto -> izquierda -> quieto -> derecha -> quieto
+  Protocolo de una linea a 115200 baudios:
+    PING
+    STOP
+    MOVE FORWARD|BACKWARD|LEFT|RIGHT <duracion_ms> <velocidad>
 
-  Probar primero con las ruedas elevadas.
+  El robot inicia detenido. Toda orden invalida detiene los motores.
 */
 
-// Pines del TB6612FNG
-const int PWMA = 3;   // Velocidad motor A (motor izquierdo)
-const int AIN1 = 4;   // Direccion motor A
-const int AIN2 = 5;   // Direccion motor A
-const int STBY = 1;   // Habilita o deshabilita el driver
-const int BIN1 = 6;   // Direccion motor B (motor derecho)
-const int BIN2 = 7;   // Direccion motor B (motor derecho)
-const int PWMB = 10;  // Velocidad motor B
+#include <string.h>
+#include <stdio.h>
 
-// Pines reservados para conexiones futuras. NO se usan para motores.
+// TB6612FNG: motor A izquierdo, motor B derecho.
+const int PWMA = 3;
+const int IN1 = 4;
+const int IN2 = 5;
+const int STBY = 1;
+const int IN3 = 6;
+const int IN4 = 7;
+const int PWMB = 10;
+
+// Reservados para sensores/servos futuros; no se usan en esta etapa.
 const int SDA_I2C = 8;
 const int SCL_I2C = 9;
-const int RX_JETSON = 20;
-const int TX_JETSON = 21;
 
-const int VELOCIDAD = 180;          // 0 a 255
-const int TIEMPO_MOVIMIENTO = 1000; // milisegundos
-const int TIEMPO_QUIETO = 1000;     // milisegundos
+const int MAX_SPEED = 180;              // Protege el driver y la primera prueba.
+const unsigned long MAX_DURATION_MS = 3000;
+const size_t COMMAND_BUFFER_SIZE = 64;
 
-bool pruebaRealizada = false;
+char commandBuffer[COMMAND_BUFFER_SIZE];
+size_t commandLength = 0;
+bool motionActive = false;
+unsigned long motionDeadline = 0;
+
+void stopMotors() {
+  analogWrite(PWMA, 0);
+  analogWrite(PWMB, 0);
+
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  digitalWrite(STBY, LOW);
+  motionActive = false;
+}
+
+void applyMotion(const char* direction, int speed) {
+  digitalWrite(STBY, HIGH);
+
+  if (strcmp(direction, "FORWARD") == 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else if (strcmp(direction, "BACKWARD") == 0) {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+  } else if (strcmp(direction, "LEFT") == 0) {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else if (strcmp(direction, "RIGHT") == 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, HIGH);
+  } else {
+    stopMotors();
+    return;
+  }
+
+  analogWrite(PWMA, speed);
+  analogWrite(PWMB, speed);
+}
+
+void processCommand(char* command) {
+  if (strcmp(command, "PING") == 0) {
+    Serial.println("PONG");
+    return;
+  }
+
+  if (strcmp(command, "STOP") == 0) {
+    stopMotors();
+    Serial.println("OK STOP");
+    return;
+  }
+
+  char direction[10] = {0};
+  long durationMs = 0;
+  int speed = 0;
+  if (sscanf(command, "MOVE %9s %ld %d", direction, &durationMs, &speed) != 3) {
+    stopMotors();
+    Serial.println("ERR INVALID_COMMAND");
+    return;
+  }
+
+  const bool validDirection =
+    strcmp(direction, "FORWARD") == 0 ||
+    strcmp(direction, "BACKWARD") == 0 ||
+    strcmp(direction, "LEFT") == 0 ||
+    strcmp(direction, "RIGHT") == 0;
+
+  if (!validDirection || durationMs <= 0 || durationMs > MAX_DURATION_MS || speed <= 0 || speed > MAX_SPEED) {
+    stopMotors();
+    Serial.println("ERR OUT_OF_RANGE");
+    return;
+  }
+
+  applyMotion(direction, speed);
+  motionActive = true;
+  motionDeadline = millis() + static_cast<unsigned long>(durationMs);
+  Serial.print("OK MOVE ");
+  Serial.println(direction);
+}
+
+void readSerialCommands() {
+  while (Serial.available() > 0) {
+    const char character = static_cast<char>(Serial.read());
+    if (character == '\r') {
+      continue;
+    }
+
+    if (character == '\n') {
+      commandBuffer[commandLength] = '\0';
+      if (commandLength > 0) {
+        processCommand(commandBuffer);
+      }
+      commandLength = 0;
+      continue;
+    }
+
+    if (commandLength >= COMMAND_BUFFER_SIZE - 1) {
+      commandLength = 0;
+      stopMotors();
+      Serial.println("ERR LINE_TOO_LONG");
+      continue;
+    }
+
+    commandBuffer[commandLength++] = character;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
 
   pinMode(PWMA, OUTPUT);
-  pinMode(AIN1, OUTPUT);
-  pinMode(AIN2, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
   pinMode(STBY, OUTPUT);
-  pinMode(BIN1, OUTPUT);
-  pinMode(BIN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
   pinMode(PWMB, OUTPUT);
 
-  quieto();
-
-  Serial.println("Mimix Robot - ESP32-C3 listo");
-  Serial.println("I2C reservado: SDA GPIO8, SCL GPIO9");
-  Serial.println("UART Jetson reservado: RX GPIO20, TX GPIO21");
-  Serial.println("La prueba inicia en 3 segundos");
-  delay(3000);
+  stopMotors();
+  Serial.println("READY MIMIX_MOTOR_V1");
 }
 
 void loop() {
-  if (!pruebaRealizada) {
-    probarMovimientos();
-    pruebaRealizada = true;
+  readSerialCommands();
+
+  if (motionActive && static_cast<long>(millis() - motionDeadline) >= 0) {
+    stopMotors();
+    Serial.println("EVENT MOTION_TIMEOUT STOP");
   }
-
-  // Cuando termina la prueba, el robot queda detenido.
-  quieto();
-}
-
-void adelante() {
-  Serial.println("Adelante");
-  digitalWrite(STBY, HIGH);
-
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(AIN2, LOW);
-  digitalWrite(BIN1, HIGH);
-  digitalWrite(BIN2, LOW);
-
-  analogWrite(PWMA, VELOCIDAD);
-  analogWrite(PWMB, VELOCIDAD);
-}
-
-void atras() {
-  Serial.println("Atras");
-  digitalWrite(STBY, HIGH);
-
-  digitalWrite(AIN1, LOW);
-  digitalWrite(AIN2, HIGH);
-  digitalWrite(BIN1, LOW);
-  digitalWrite(BIN2, HIGH);
-
-  analogWrite(PWMA, VELOCIDAD);
-  analogWrite(PWMB, VELOCIDAD);
-}
-
-void izquierda() {
-  Serial.println("Izquierda");
-  digitalWrite(STBY, HIGH);
-
-  // El motor izquierdo va atras y el derecho adelante.
-  digitalWrite(AIN1, LOW);
-  digitalWrite(AIN2, HIGH);
-  digitalWrite(BIN1, HIGH);
-  digitalWrite(BIN2, LOW);
-
-  analogWrite(PWMA, VELOCIDAD);
-  analogWrite(PWMB, VELOCIDAD);
-}
-
-void derecha() {
-  Serial.println("Derecha");
-  digitalWrite(STBY, HIGH);
-
-  // El motor izquierdo va adelante y el derecho atras.
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(AIN2, LOW);
-  digitalWrite(BIN1, LOW);
-  digitalWrite(BIN2, HIGH);
-
-  analogWrite(PWMA, VELOCIDAD);
-  analogWrite(PWMB, VELOCIDAD);
-}
-
-void quieto() {
-  analogWrite(PWMA, 0);
-  analogWrite(PWMB, 0);
-
-  digitalWrite(AIN1, LOW);
-  digitalWrite(AIN2, LOW);
-  digitalWrite(BIN1, LOW);
-  digitalWrite(BIN2, LOW);
-  digitalWrite(STBY, LOW);
-}
-
-void probarMovimientos() {
-  adelante();
-  delay(TIEMPO_MOVIMIENTO);
-  quieto();
-  delay(TIEMPO_QUIETO);
-
-  atras();
-  delay(TIEMPO_MOVIMIENTO);
-  quieto();
-  delay(TIEMPO_QUIETO);
-
-  izquierda();
-  delay(TIEMPO_MOVIMIENTO);
-  quieto();
-  delay(TIEMPO_QUIETO);
-
-  derecha();
-  delay(TIEMPO_MOVIMIENTO);
-  quieto();
-
-  Serial.println("Prueba terminada. Robot quieto.");
 }
