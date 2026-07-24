@@ -93,6 +93,7 @@ class MimixGuide:
         self.settings = settings
         self.web = MimixWebClient(settings)
         self.conversation: Conversation | None = None
+        self.session_started = False
 
     def run(self) -> None:
         tools = ClientTools()
@@ -116,12 +117,18 @@ class MimixGuide:
         )
 
         LOGGER.info("Iniciando conversación de Wall-E con el agente %s", self.settings.agent_id)
-        self.conversation.start_session(user_id=self.settings.robot_id)
+        # La versión actual del SDK de ElevenLabs no acepta user_id como
+        # argumento de start_session(). El identificador local se conserva
+        # para futura telemetría, sin bloquear la conversación de voz.
+        self.conversation.start_session()
+        self.session_started = True
         conversation_id = self.conversation.wait_for_session_end()
         LOGGER.info("Conversación finalizada: %s", conversation_id)
 
     def stop(self) -> None:
-        if self.conversation:
+        # No intentes detener la interfaz de audio si start_session falló
+        # antes de inicializarla.
+        if self.conversation and self.session_started:
             self.conversation.end_session()
         self.web.close()
 
