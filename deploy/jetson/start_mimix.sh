@@ -199,9 +199,22 @@ validate_ros_configuration() {
   fi
 }
 
-build_ros_workspace() {
+source_ros_setup() {
+  local setup_file="$1"
+  local setup_status=0
+
+  # Los scripts de entorno de ROS Jazzy consultan algunas variables opcionales
+  # antes de inicializarlas. El lanzador usa `set -u`, por lo que se desactiva
+  # solo mientras se carga cada script de ROS.
+  set +u
   # shellcheck disable=SC1090
-  source "$ROS_SETUP"
+  source "$setup_file" || setup_status=$?
+  set -u
+  return "$setup_status"
+}
+
+build_ros_workspace() {
+  source_ros_setup "$ROS_SETUP"
   cd "$ROS_WORKSPACE"
   colcon build --symlink-install
 }
@@ -243,10 +256,8 @@ run_ros() {
     armed=true
   fi
 
-  # shellcheck disable=SC1090
-  source "$ROS_SETUP"
-  # shellcheck disable=SC1091
-  source "$ROS_WORKSPACE/install/setup.bash"
+  source_ros_setup "$ROS_SETUP"
+  source_ros_setup "$ROS_WORKSPACE/install/setup.bash"
   exec ros2 launch mimix_bringup robot.launch.py \
     "web_url:=$WEB_URL" \
     "bridge_token:=${MIMIX_ROBOT_BRIDGE_TOKEN:-}" \
