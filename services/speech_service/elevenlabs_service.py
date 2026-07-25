@@ -2,16 +2,18 @@
 """Guía conversacional de Mimix con audio local y ElevenLabs Agents.
 
 El proceso se ejecuta en la Jetson: toma el micrófono y parlante predeterminados,
-y registra únicamente las dos herramientas permitidas para la primera versión.
+y registra las tres herramientas permitidas: get_mimix_context, navigate_to y get_dialogue.
 Nunca ejecuta URLs, JavaScript ni comandos de hardware solicitados por el LLM.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import signal
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -51,6 +53,41 @@ class Settings:
                 "MIMIX_VOICE_GESTURE_URL", "http://127.0.0.1:8092/talk"
             ).rstrip("/"),
         )
+
+
+class DialogueManager:
+    """Carga y consulta los diálogos configurables desde dialogues.json."""
+
+    def __init__(self, dialogues_path: Path | None = None) -> None:
+        if dialogues_path is None:
+            dialogues_path = Path(__file__).resolve().parent / "dialogues.json"
+        self.dialogues_path = dialogues_path
+        self.dialogues: list[dict[str, Any]] = []
+        self._reload()
+
+    def _reload(self) -> None:
+        try:
+            data = json.loads(self.dialogues_path.read_text(encoding="utf-8"))
+            self.dialogues = data.get("dialogues", [])
+            LOGGER.info("Diálogos cargados: %d entradas", len(self.dialogues))
+        except Exception:
+            LOGGER.exception("No se pudieron cargar los diálogos desde %s", self.dialogues_path)
+            self.dialogues = []
+
+    def get_dialogue(self, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+        keyword = ((parameters or {}).get("keyword") or "").strip().lower()
+        if not keyword:
+            return {"found": False, "response": ""}
+
+        for dialogue in self.dialogues:
+            for kw in dialogue.get("keywords", []):
+                kw_lower = kw.lower()
+                if kw_lower in keyword or keyword in kw_lower:
+                    LOGGER.info("Diálogo encontrado: %s -> %s", dialogue["id"], keyword)
+                    return {"found": True, "response": dialogue["response"]}
+
+        LOGGER.info("Ningún diálogo coincide con: %s", keyword)
+        return {"found": False, "response": ""}
 
 
 class MimixWebClient:
@@ -124,6 +161,7 @@ class MimixGuide:
         self.settings = settings
         self.web = MimixWebClient(settings)
         self.gestures = VoiceGestureClient(settings)
+        self.dialogues = DialogueManager()
         self.conversation: Conversation | None = None
         self.session_started = False
 
@@ -137,6 +175,7 @@ class MimixGuide:
         # configuradas en el panel de ElevenLabs.
         tools.register("get_mimix_context", self.web.get_context)
         tools.register("navigate_to", self.web.navigate_to)
+        tools.register("get_dialogue", self.dialogues.get_dialogue)
 
         client = ElevenLabs(api_key=self.settings.api_key)
         self.conversation = Conversation(

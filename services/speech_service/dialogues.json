@@ -1,0 +1,87 @@
+{
+  "description": "Diálogos configurables de Wall-E. Edita este archivo para cambiar lo que dice el robot.",
+  "dialogues": [
+    {
+      "id": "presentate",
+      "keywords": [
+        "preséntate",
+        "presentate",
+        "quién eres",
+        "quien eres",
+        "cómo te llamas",
+        "como te llamas",
+        "dime tu nombre"
+      ],
+      "response": "¡Hola! Soy Wall-E, el robot educativo de Mimix. Estoy aquí para ayudarte a aprender sobre tecnología, ciencia y matemáticas. ¿En qué quieres que te ayude hoy?"
+    },
+
+    {
+      "id": "aprender_matematicas",
+      "keywords": [
+        "quiero aprender matemáticas",
+        "quiero aprender matematicas",
+        "matemáticas",
+        "matematicas",
+        "aprender mates"
+      ],
+      "response": "¡Qué bien! Las matemáticas son increíbles. Con los números podemos resolver problemas, medir el mundo y hasta viajar al espacio. ¿Quieres explorar alguna misión de matemáticas?"
+    },
+
+    {
+      "id": "aprender_ciencias",
+      "keywords": [
+        "quiero aprender ciencias",
+        "quiero aprender ciencia",
+        "ciencias",
+        "ciencia",
+        "aprender ciencia"
+      ],
+      "response": "¡La ciencia es fascinante! Nos ayuda a entender cómo funciona todo: desde las estrellas hasta las plantas. ¿Te gustaría hacer una misión de ciencias?"
+    },
+
+    {
+      "id": "mision_m1_sumar",
+      "keywords": [
+        "misión sumar",
+        "mision sumar",
+        "aprender a sumar",
+        "suma"
+      ],
+      "response": "¡Vamos a aprender a sumar! La suma es juntar cantidades. Por ejemplo, si tienes 2 manzanas y te dan 3 más, ahora tienes 5. ¿Quieres intentar un ejercicio?"
+    },
+
+    {
+      "id": "mision_m2_restar",
+      "keywords": [
+        "misión restar",
+        "mision restar",
+        "aprender a restar",
+        "resta"
+      ],
+      "response": "¡Hora de restar! Restar es quitar una cantidad de otra. Si tienes 5 dulces y te comes 2, te quedan 3. ¿Practicamos juntos?"
+    },
+
+    {
+      "id": "mision_c1_plantas",
+      "keywords": [
+        "misión plantas",
+        "mision plantas",
+        "aprender de plantas",
+        "plantas"
+      ],
+      "response": "¡Las plantas son seres vivos increíbles! Fabrican su propio alimento con la luz del sol, y nos dan oxígeno para respirar. ¿Sabías que hay más de 300 mil especies de plantas en el mundo?"
+    },
+
+    {
+      "id": "mision_c2_estrellas",
+      "keywords": [
+        "misión estrellas",
+        "mision estrellas",
+        "aprender de estrellas",
+        "estrellas",
+        "espacio"
+      ],
+      "response": "¡El espacio es enorme! Las estrellas son como nuestro Sol pero muy lejanas. Algunas son cien veces más grandes que el Sol. La estrella más cercana está a 4 años luz. ¿Quieres saber más?"
+    }
+  ]
+}

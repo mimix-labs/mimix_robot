@@ -6,31 +6,68 @@ ElevenLabs y llama a Mimix Web por `localhost` mediante herramientas locales.
 
 ## Alcance inicial
 
-Solo hay dos funciones permitidas:
+Hay tres funciones permitidas:
 
 | Herramienta | Parámetros | Resultado |
 | --- | --- | --- |
 | `get_mimix_context` | ninguno | Consulta en qué zona o reto está Mimix Web. |
 | `navigate_to` | `destination` = `world`, `mathematics` o `science` | Solicita abrir uno de esos destinos. |
+| `get_dialogue` | `keyword` = palabra clave del estudiante | Busca en `dialogues.json` y devuelve el texto exacto del diálogo. |
 
 El LLM no recibe permisos para ejecutar URLs, JavaScript, terminal ni control
 de motores. Mimix Web valida los destinos y el navegador realiza la navegación.
 
+### Diálogos configurables (`dialogues.json`)
+
+Los diálogos predefinidos se editan en `dialogues.json`. Cada entrada tiene:
+
+```json
+{
+  "id": "aprender_matematicas",
+  "keywords": ["quiero aprender matemáticas", "matematicas"],
+  "response": "¡Qué bien! Las matemáticas son increíbles..."
+}
+```
+
+- **id**: identificador único (no se usa en runtime, solo para organizar)
+- **keywords**: lista de frases que disparan este diálogo (sin acentos ni mayúsculas)
+- **response**: texto exacto que dirá Wall-E
+
+El agente debe llamar a `get_dialogue` con la palabra clave extraída del mensaje
+del estudiante. Si `found` es `true`, debe repetir el texto de `response` textualmente.
+Si `found` es `false`, debe responder con su comportamiento normal de conversación.
+
 ## Configurar ElevenLabs
 
-1. En el agente Wall-E, abre **Herramientas** y crea dos herramientas de tipo
-   **Client** con los nombres exactos `get_mimix_context` y `navigate_to`.
-2. Activa **Wait for response** en ambas.
+1. En el agente Wall-E, abre **Herramientas** y crea tres herramientas de tipo
+   **Client** con los nombres exactos `get_mimix_context`, `navigate_to` y `get_dialogue`.
+2. Activa **Wait for response** en todas.
 3. `get_mimix_context` no lleva parámetros.
 4. `navigate_to` lleva un parámetro obligatorio de texto: `destination`.
    Describe que acepta solamente `world`, `mathematics` o `science`.
-5. Agrega al mensaje del sistema del agente:
+5. `get_dialogue` lleva un parámetro obligatorio de texto: `keyword`.
+   Describe que acepta la palabra clave del estudiante (ej. "preséntate", "matemáticas").
+6. Agrega al mensaje del sistema del agente:
 
 ```text
+## HERRAMIENTAS DISPONIBLES
+
+- get_mimix_context: consulta en qué zona o reto está el estudiante.
+- navigate_to: navega a world, mathematics o science.
+- get_dialogue: busca diálogos predefinidos por palabra clave. Recibe un parámetro "keyword".
+  Si found=true, DEBES repetir el texto de "response" textualmente, sin modificarlo.
+  Si found=false, responde con tu comportamiento normal.
+
+Cuando el estudiante use frases como "preséntate", "quiero aprender matemáticas",
+"misión sumar", etc., llama primero a get_dialogue. Si encuentra el diálogo,
+repite el texto exacto. Si no lo encuentra, conversa normalmente.
+
 Cuando el estudiante pida ir a Matemáticas, Ciencias o volver al mundo, usa
 la herramienta navigate_to con el destino permitido. Espera su resultado antes
-de confirmar que la navegación ocurrió. Cuando necesites saber dónde está el
-estudiante o qué objeto eligió, usa get_mimix_context.
+de confirmar que la navegación ocurrió.
+
+SOLO responde si el mensaje contiene tu nombre "Wall-E" o "Wally".
+Si no te llaman por tu nombre, quédate en silencio.
 ```
 
 Publica el agente después de crear las herramientas. La clave de API nunca se
