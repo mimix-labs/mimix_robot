@@ -17,13 +17,20 @@ class VoiceGestureBridge(Node):
     """La voz solicita duración; ROS programa los servos y finaliza en BASE."""
 
     MIN_DURATION_MS = 1000
-    MAX_DURATION_MS = 5000
-    FRAME_INTERVAL_SECONDS = 0.45
-    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5).
+    MAX_DURATION_MS = 7000
+    FRAME_INTERVAL_SECONDS = 0.70
+    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5). Las variaciones
+    # pequeñas entre cuadros permiten que los servos lleguen suavemente.
     TALK_FRAMES = (
+        ((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)),
+        ((1, 186), (2, 474), (3, 395), (4, 156), (5, 394)),
+        ((1, 194), (2, 466), (3, 385), (4, 164), (5, 386)),
+        ((1, 202), (2, 458), (3, 372), (4, 172), (5, 378)),
+        ((1, 196), (2, 464), (3, 382), (4, 166), (5, 384)),
         ((1, 210), (2, 455), (3, 370), (4, 175), (5, 375)),
-        ((1, 190), (2, 470), (3, 430), (4, 160), (5, 390)),
-        ((1, 225), (2, 445), (3, 395), (4, 185), (5, 365)),
+        ((1, 198), (2, 462), (3, 405), (4, 166), (5, 384)),
+        ((1, 190), (2, 470), (3, 420), (4, 160), (5, 390)),
+        ((1, 184), (2, 476), (3, 410), (4, 154), (5, 396)),
         ((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)),
     )
 
