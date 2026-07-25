@@ -2,8 +2,10 @@
 
 ## Arranque de demostración física
 
-Con `mimix_web` y `mimix_robot` instalados como directorios hermanos, configura
-una única vez el puerto estable del ESP32 en `~/mimix_robot/.env`:
+Con `mimix_web` y `mimix_robot` instalados como directorios hermanos, el
+iniciador detecta automáticamente una única ESP32-C3 Espressif conectada. Si
+hay varias C3 o se quiere fijar un puerto, configurarlo en
+`~/mimix_robot/.env`:
 
 ```bash
 MIMIX_SERIAL_PORT=/dev/serial/by-id/REEMPLAZAR_POR_EL_ESP32

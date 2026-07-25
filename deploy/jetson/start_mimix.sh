@@ -74,6 +74,32 @@ WEB_URL="${MIMIX_WEB_URL:-http://127.0.0.1:4000}"
 SERIAL_PORT="${MIMIX_SERIAL_PORT:-}"
 SERIAL_BAUD="${MIMIX_SERIAL_BAUD:-115200}"
 
+discover_esp32_serial_port() {
+  local candidate
+  local -a matches=()
+
+  for candidate in /dev/serial/by-id/*Espressif*; do
+    [[ -e "$candidate" ]] || continue
+    matches+=("$candidate")
+  done
+
+  if (( ${#matches[@]} == 1 )); then
+    printf '%s\n' "${matches[0]}"
+    return 0
+  fi
+
+  return 1
+}
+
+prepare_local_display() {
+  if [[ -n "${DISPLAY:-}" || ! -S /tmp/.X11-unix/X0 ]]; then
+    return
+  fi
+
+  export DISPLAY=:0
+  echo "DISPLAY no estaba definido; se usará el escritorio local :0."
+}
+
 start_process() {
   local name="$1"
   shift
@@ -158,8 +184,13 @@ validate_ros_configuration() {
 
   if [[ "$PHYSICAL_MODE" == true ]]; then
     if [[ -z "$SERIAL_PORT" ]]; then
-      echo "Falta MIMIX_SERIAL_PORT en $ENV_FILE para el arranque físico." >&2
-      exit 1
+      if SERIAL_PORT="$(discover_esp32_serial_port)"; then
+        echo "ESP32-C3 detectada automáticamente en $SERIAL_PORT"
+      else
+        echo "No se encontró una única ESP32-C3 en /dev/serial/by-id/." >&2
+        echo "Conecta la C3 o define MIMIX_SERIAL_PORT en $ENV_FILE." >&2
+        exit 1
+      fi
     fi
     if [[ ! -e "$SERIAL_PORT" ]]; then
       echo "No existe el puerto ESP32 configurado: $SERIAL_PORT" >&2
@@ -238,6 +269,7 @@ if wait_for_native_vision; then
 fi
 
 if [[ "$START_BROWSER" == true ]]; then
+  prepare_local_display
   if [[ -z "${DISPLAY:-}" ]]; then
     echo "No hay sesión gráfica (DISPLAY). Chromium no se abrirá; usa --no-browser para este modo." >&2
   else
