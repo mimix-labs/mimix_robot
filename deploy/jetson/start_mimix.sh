@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Orquesta Mimix en una Jetson: Web, visión nativa, Chromium y voz opcional.
+# Orquesta Mimix en una Jetson: Web, visión, ROS y voz.
 
 set -euo pipefail
 
@@ -8,22 +8,38 @@ ROBOT_DIR="$(cd "$JETSON_DIR/../.." && pwd)"
 ENV_FILE="$ROBOT_DIR/.env"
 LOG_DIR="$ROBOT_DIR/logs/jetson"
 START_VOICE=false
+START_ROS=false
 START_BROWSER=true
+PHYSICAL_MODE=false
+SKIP_ROS_BUILD=false
 PIDS=()
 
 usage() {
   cat <<'EOF'
-Uso: bash deploy/jetson/start_mimix.sh [--voice] [--no-browser]
+Uso: bash deploy/jetson/start_mimix.sh [--voice] [--ros] [--physical] [--no-browser] [--skip-ros-build]
 
-  --voice       Inicia también el guía Wall-E.
-  --no-browser  No abre Chromium; útil para diagnóstico remoto.
+  --voice           Inicia el guía Wall-E.
+  --ros             Inicia ROS en modo seguro (dry_run=true, desarmado).
+  --physical        Inicia voz y ROS físico, arma el robot y habilita los gestos.
+  --no-browser      No abre Chromium; útil para diagnóstico remoto.
+  --skip-ros-build  No reconstruye el workspace ROS antes de iniciarlo.
+
+Para una demostración física completa:
+  bash deploy/jetson/start_mimix.sh --physical
 EOF
 }
 
 for argument in "$@"; do
   case "$argument" in
     --voice) START_VOICE=true ;;
+    --ros) START_ROS=true ;;
+    --physical)
+      START_VOICE=true
+      START_ROS=true
+      PHYSICAL_MODE=true
+      ;;
     --no-browser) START_BROWSER=false ;;
+    --skip-ros-build) SKIP_ROS_BUILD=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Opción no reconocida: $argument" >&2; usage >&2; exit 2 ;;
   esac
@@ -51,12 +67,30 @@ fi
 
 mkdir -p "$LOG_DIR"
 
+ROS_WORKSPACE="$ROBOT_DIR/ros_ws"
+ROS_SETUP="/opt/ros/jazzy/setup.bash"
+WEB_URL="${MIMIX_WEB_URL:-http://127.0.0.1:4000}"
+SERIAL_PORT="${MIMIX_SERIAL_PORT:-}"
+SERIAL_BAUD="${MIMIX_SERIAL_BAUD:-115200}"
+
 start_process() {
   local name="$1"
   shift
   "$@" >"$LOG_DIR/$name.log" 2>&1 &
   PIDS+=("$!")
   echo "Iniciado $name (registro: $LOG_DIR/$name.log)"
+}
+
+ensure_last_process_is_running() {
+  local name="$1"
+  local pid="${PIDS[${#PIDS[@]} - 1]}"
+
+  sleep 1
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "El proceso $name terminó al iniciar. Revisa $LOG_DIR/$name.log." >&2
+    tail -n 30 "$LOG_DIR/$name.log" >&2 || true
+    exit 1
+  fi
 }
 
 stop_processes() {
@@ -72,7 +106,7 @@ trap stop_processes EXIT INT TERM
 wait_for_url() {
   local url="$1"
   local label="$2"
-  local attempts=50
+  local attempts="${3:-50}"
 
   while (( attempts > 0 )); do
     if curl --silent --fail "$url" >/dev/null 2>&1; then
@@ -84,6 +118,60 @@ wait_for_url() {
 
   echo "No respondió $label en $url. Revisa $LOG_DIR." >&2
   exit 1
+}
+
+ensure_port_is_free() {
+  local port="$1"
+
+  if command -v fuser >/dev/null 2>&1; then
+    if fuser -s "${port}/tcp"; then
+      echo "El puerto local ${port} ya está en uso. Cierra el ROS antiguo antes de continuar:" >&2
+      echo "  fuser -v ${port}/tcp" >&2
+      exit 1
+    fi
+    return
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    if ss -ltnH "sport = :${port}" | grep -q .; then
+      echo "El puerto local ${port} ya está en uso. Cierra el ROS antiguo antes de continuar." >&2
+      exit 1
+    fi
+    return
+  fi
+
+  echo "No se encontró fuser ni ss para comprobar el puerto ${port}." >&2
+  exit 1
+}
+
+validate_ros_configuration() {
+  if [[ ! -f "$ROS_SETUP" ]]; then
+    echo "No se encontró ROS Jazzy en $ROS_SETUP." >&2
+    exit 1
+  fi
+
+  if [[ ! -d "$ROS_WORKSPACE/src" ]]; then
+    echo "No se encontró el workspace ROS en $ROS_WORKSPACE." >&2
+    exit 1
+  fi
+
+  if [[ "$PHYSICAL_MODE" == true ]]; then
+    if [[ -z "$SERIAL_PORT" ]]; then
+      echo "Falta MIMIX_SERIAL_PORT en $ENV_FILE para el arranque físico." >&2
+      exit 1
+    fi
+    if [[ ! -e "$SERIAL_PORT" ]]; then
+      echo "No existe el puerto ESP32 configurado: $SERIAL_PORT" >&2
+      exit 1
+    fi
+  fi
+}
+
+build_ros_workspace() {
+  # shellcheck disable=SC1090
+  source "$ROS_SETUP"
+  cd "$ROS_WORKSPACE"
+  colcon build --symlink-install
 }
 
 wait_for_native_vision() {
@@ -111,6 +199,28 @@ run_web_server() {
 run_web_client() {
   cd "$WEB_DIR"
   exec npm run dev --prefix client -- --host 0.0.0.0
+}
+
+run_ros() {
+  local dry_run=true
+  local armed=false
+
+  if [[ "$PHYSICAL_MODE" == true ]]; then
+    dry_run=false
+    armed=true
+  fi
+
+  # shellcheck disable=SC1090
+  source "$ROS_SETUP"
+  # shellcheck disable=SC1091
+  source "$ROS_WORKSPACE/install/setup.bash"
+  exec ros2 launch mimix_bringup robot.launch.py \
+    "web_url:=$WEB_URL" \
+    "bridge_token:=${MIMIX_ROBOT_BRIDGE_TOKEN:-}" \
+    "serial_port:=$SERIAL_PORT" \
+    "serial_baud:=$SERIAL_BAUD" \
+    "dry_run:=$dry_run" \
+    "armed:=$armed"
 }
 
 start_process "web-server" run_web_server
@@ -145,9 +255,27 @@ if [[ "$START_BROWSER" == true ]]; then
   fi
 fi
 
-if [[ "$START_VOICE" == true ]]; then
-  start_process "voice" bash "$ROBOT_DIR/services/speech_service/start_walle.sh"
+if [[ "$START_ROS" == true ]]; then
+  validate_ros_configuration
+  ensure_port_is_free 8092
+  if [[ "$SKIP_ROS_BUILD" == false ]]; then
+    echo "Reconstruyendo ROS..."
+    build_ros_workspace
+  fi
+  start_process "ros" run_ros
+  wait_for_url "http://127.0.0.1:8092/health" "puente de gestos ROS" 300
 fi
 
-echo "Mimix Jetson está listo. Presiona Ctrl+C para detener los procesos iniciados."
+if [[ "$START_VOICE" == true ]]; then
+  start_process "voice" bash "$ROBOT_DIR/services/speech_service/start_walle.sh"
+  ensure_last_process_is_running "voice"
+fi
+
+if [[ "$PHYSICAL_MODE" == true ]]; then
+  echo "Mimix está listo: voz y gestos físicos activos. Presiona Ctrl+C para detenerlo."
+elif [[ "$START_ROS" == true ]]; then
+  echo "Mimix está listo: ROS activo en simulación segura (dry_run=true, desarmado)."
+else
+  echo "Mimix Jetson está listo. Presiona Ctrl+C para detener los procesos iniciados."
+fi
 wait

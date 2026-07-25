@@ -143,3 +143,8 @@ Cuando ElevenLabs comunica una respuesta de Wall-E, el servicio solicita un
 gesto corto al puente ROS local. El puente debe estar iniciado mediante
 `ros2 launch mimix_bringup robot.launch.py` y el robot debe estar armado. Si
 ROS no está iniciado, la conversación de voz continúa sin gestos.
+
+Para la demostración completa no hace falta abrir terminales separadas: usa
+`bash deploy/jetson/start_mimix.sh --physical` desde la raíz de `mimix_robot`.
+Ese lanzador inicia ROS antes de Wall-E y arma el robot solo si
+`MIMIX_SERIAL_PORT` está configurado en `.env`.

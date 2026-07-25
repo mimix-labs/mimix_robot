@@ -45,6 +45,19 @@ source install/setup.bash
 
 ## Ejecutar de forma segura
 
+Para el uso diario en la Jetson, usa el lanzador único desde la raíz del
+repositorio:
+
+```bash
+bash deploy/jetson/start_mimix.sh --physical
+```
+
+Requiere `MIMIX_SERIAL_PORT` en `~/mimix_robot/.env`; inicia Web, ROS y voz,
+conecta el ESP32 con `dry_run=false` y arma el robot. Antes de ejecutarlo,
+cierra el Monitor Serie de Arduino y cualquier lanzamiento ROS anterior.
+
+El procedimiento manual queda disponible para diagnóstico:
+
 Primero inicia Mimix Web con el lanzador existente. En otra terminal:
 
 ```bash

@@ -69,6 +69,23 @@ class VoiceGestureBridge(Node):
         bridge = self
 
         class GestureRequestHandler(BaseHTTPRequestHandler):
+            def write_json(self, code, payload):
+                body = json.dumps(payload).encode('utf-8')
+                self.send_response(code)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                if self.path.split('?', 1)[0] != '/health':
+                    self.send_error(404)
+                    return
+                self.write_json(200, {
+                    'ok': True,
+                    'gesture_active': bridge.gesture_active,
+                })
+
             def do_POST(self):
                 if self.path.split('?', 1)[0] != '/talk':
                     self.send_error(404)
@@ -81,21 +98,11 @@ class VoiceGestureBridge(Node):
                     duration = int(payload.get('duration_ms'))
                     duration = min(max(duration, bridge.MIN_DURATION_MS), bridge.MAX_DURATION_MS)
                 except (TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as error:
-                    body = json.dumps({'accepted': False, 'message': str(error)}).encode('utf-8')
-                    self.send_response(400)
-                    self.send_header('Content-Type', 'application/json')
-                    self.send_header('Content-Length', str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
+                    self.write_json(400, {'accepted': False, 'message': str(error)})
                     return
 
                 bridge.pending_durations.put(duration)
-                body = json.dumps({'accepted': True, 'duration_ms': duration}).encode('utf-8')
-                self.send_response(202)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Content-Length', str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self.write_json(202, {'accepted': True, 'duration_ms': duration})
 
             def log_message(self, _format, *_args):
                 return

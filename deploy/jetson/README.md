@@ -1,19 +1,31 @@
 # Despliegue en Jetson
 
-## Arranque de demostración
+## Arranque de demostración física
 
-Con `mimix_web` y `mimix_robot` instalados como directorios hermanos, usa:
+Con `mimix_web` y `mimix_robot` instalados como directorios hermanos, configura
+una única vez el puerto estable del ESP32 en `~/mimix_robot/.env`:
+
+```bash
+MIMIX_SERIAL_PORT=/dev/serial/by-id/REEMPLAZAR_POR_EL_ESP32
+```
+
+Después, el arranque completo —Web, visión, Chromium, ROS, voz y gestos— usa
+una sola terminal y un solo comando:
 
 ```bash
 cd ~/mimix_robot
-bash deploy/jetson/start_mimix.sh --voice
+bash deploy/jetson/start_mimix.sh --physical
 ```
 
-El lanzador inicia el backend Web, el cliente Vite accesible por la red local,
-la visión nativa y Chromium con su perfil aislado y las opciones GPU requeridas.
-`--voice` agrega el servicio Wall-E; sin esa opción la voz queda detenida.
-Usa `--no-browser` al ejecutarlo por SSH o para diagnóstico remoto. Los
-registros quedan en `~/mimix_robot/logs/jetson/` y `Ctrl+C` detiene los
+`--physical` reconstruye ROS, inicia el puente de gestos, conecta el ESP32 con
+`dry_run=false`, arma la seguridad y recién después inicia Wall-E. Si falta el
+puerto serial o el puerto local `8092` ya está ocupado, el lanzador se detiene
+sin mover el robot y explica cómo corregirlo. No carga firmware.
+
+`--ros` inicia ROS en simulación segura y desarmada. `--voice` inicia solo la
+voz. Usa `--no-browser` al ejecutarlo por SSH o para diagnóstico remoto, y
+`--skip-ros-build` en reinicios posteriores cuando el workspace no cambió. Los
+registros quedan en `~/mimix_robot/logs/jetson/`; `Ctrl+C` detiene todos los
 procesos que inició el lanzador.
 
 El navegador de la Jetson abre con `?vision=robot`. Un navegador normal usa
