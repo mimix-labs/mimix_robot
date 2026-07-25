@@ -126,10 +126,10 @@ calibrados en el firmware; ROS y el ESP32 rechazan un valor fuera de rango.
 El lanzamiento ROS incluye un puente local en `http://127.0.0.1:8092/talk`.
 El servicio de voz de Wall-E lo llama automáticamente al comenzar una respuesta
 de ElevenLabs. El gesto pasa por `safety_node`, dura entre uno y cinco segundos
-y el firmware termina siempre en la posición base.
+y ROS envía `BASE` al terminar.
 
 Para probarlo sin voz, con ROS armado:
 
 ```bash
-ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "{id: 'talk-test', action: 'conversation_gesture', max_duration_ms: 3000, payload_json: '{\"duration_ms\": 3000}'}"
+curl -sS -X POST http://127.0.0.1:8092/talk -H 'Content-Type: application/json' -d '{"duration_ms":3000}'
 ```

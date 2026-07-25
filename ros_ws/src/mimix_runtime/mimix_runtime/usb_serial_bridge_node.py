@@ -99,16 +99,6 @@ class UsbSerialBridge(Node):
         if action == 'base_pose':
             return 'BASE'
 
-        if action == 'conversation_gesture':
-            try:
-                payload = json.loads(request.payload_json or '{}')
-                duration = int(payload.get('duration_ms', request.max_duration_ms))
-            except (TypeError, ValueError, json.JSONDecodeError) as error:
-                raise ValueError('El gesto de conversación requiere duration_ms numérico.') from error
-
-            duration = min(max(duration, 1000), 5000)
-            return f'TALK {duration}'
-
         if action in self.SERVO_LIMITS:
             try:
                 payload = json.loads(request.payload_json or '{}')

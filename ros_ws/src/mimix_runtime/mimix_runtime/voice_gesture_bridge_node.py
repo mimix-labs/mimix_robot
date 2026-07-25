@@ -1,6 +1,7 @@
-"""Puente HTTP local: la voz solicita gestos sin controlar hardware directamente."""
+"""Convierte eventos locales de voz en una animación ROS de servos."""
 
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Empty, Queue
 from threading import Thread
@@ -13,10 +14,18 @@ from .common import now_ms, status
 
 
 class VoiceGestureBridge(Node):
-    """Acepta POST local /talk y publica una solicitud ROS de gesto conversacional."""
+    """La voz solicita duración; ROS programa los servos y finaliza en BASE."""
 
     MIN_DURATION_MS = 1000
     MAX_DURATION_MS = 5000
+    FRAME_INTERVAL_SECONDS = 0.45
+    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5).
+    TALK_FRAMES = (
+        ((1, 210), (2, 455), (3, 370), (4, 175), (5, 375)),
+        ((1, 190), (2, 470), (3, 430), (4, 160), (5, 390)),
+        ((1, 225), (2, 445), (3, 395), (4, 185), (5, 365)),
+        ((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)),
+    )
 
     def __init__(self):
         super().__init__('mimix_voice_gesture_bridge')
@@ -29,6 +38,11 @@ class VoiceGestureBridge(Node):
         self.status_publisher = self.create_publisher(RobotStatus, '/mimix/robot/status', 10)
         self.server = None
         self.server_thread = None
+        self.gesture_active = False
+        self.gesture_deadline = 0.0
+        self.next_frame_at = 0.0
+        self.frame_index = 0
+        self.request_sequence = 0
 
         try:
             self.server = ThreadingHTTPServer((self.host, self.port), self.make_handler())
@@ -42,7 +56,7 @@ class VoiceGestureBridge(Node):
             self.get_logger().error(f'No se pudo iniciar el puente de gestos: {error}')
             self.status_publisher.publish(status('voice_gesture_bridge', 'error', str(error)))
 
-        self.create_timer(0.05, self.publish_pending_gestures)
+        self.create_timer(0.05, self.update_gesture)
 
     def make_handler(self):
         bridge = self
@@ -52,7 +66,6 @@ class VoiceGestureBridge(Node):
                 if self.path.split('?', 1)[0] != '/talk':
                     self.send_error(404)
                     return
-
                 try:
                     length = int(self.headers.get('Content-Length', '0'))
                     if length <= 0 or length > 4096:
@@ -82,24 +95,56 @@ class VoiceGestureBridge(Node):
 
         return GestureRequestHandler
 
-    def publish_pending_gestures(self):
+    def publish_request(self, action, payload=None):
+        self.request_sequence += 1
+        request = MotionRequest()
+        request.id = f'voice-talk-{now_ms()}-{self.request_sequence}'
+        request.action = action
+        request.max_duration_ms = 100
+        request.payload_json = json.dumps(payload or {})
+        self.motion_publisher.publish(request)
+
+    def publish_frame(self):
+        for servo_number, pulse in self.TALK_FRAMES[self.frame_index]:
+            self.publish_request(f'servo_{servo_number}', {'pulse': pulse})
+        self.frame_index = (self.frame_index + 1) % len(self.TALK_FRAMES)
+
+    def start_or_extend_gesture(self, duration_ms):
+        now = time.monotonic()
+        deadline = now + duration_ms / 1000.0
+        if not self.gesture_active:
+            self.gesture_active = True
+            self.frame_index = 0
+            self.next_frame_at = now
+        self.gesture_deadline = max(self.gesture_deadline, deadline)
+        self.status_publisher.publish(status(
+            'voice_gesture_bridge', 'gesture_requested', f'{duration_ms} ms',
+        ))
+
+    def update_gesture(self):
         while True:
             try:
-                duration = self.pending_durations.get_nowait()
+                self.start_or_extend_gesture(self.pending_durations.get_nowait())
             except Empty:
-                return
+                break
 
-            request = MotionRequest()
-            request.id = f'voice-talk-{now_ms()}'
-            request.action = 'conversation_gesture'
-            request.max_duration_ms = duration
-            request.payload_json = json.dumps({'duration_ms': duration})
-            self.motion_publisher.publish(request)
-            self.status_publisher.publish(status(
-                'voice_gesture_bridge', 'gesture_requested', f'{duration} ms',
-            ))
+        if not self.gesture_active:
+            return
+
+        now = time.monotonic()
+        if now >= self.gesture_deadline:
+            self.publish_request('base_pose')
+            self.gesture_active = False
+            self.status_publisher.publish(status('voice_gesture_bridge', 'gesture_complete_base'))
+            return
+
+        if now >= self.next_frame_at:
+            self.publish_frame()
+            self.next_frame_at = now + self.FRAME_INTERVAL_SECONDS
 
     def destroy_node(self):
+        if self.gesture_active:
+            self.publish_request('base_pose')
         if self.server:
             self.server.shutdown()
             self.server.server_close()

@@ -43,15 +43,14 @@ Los valores son pulsos PWM calibrados fisicamente, no grados.
 | `MOVE FORWARD 500` | `OK MOVE FORWARD` | Mueve en la direccion indicada. |
 | `BASE` | `OK BASE` | Lleva los cinco servos a la posicion base. |
 | `SERVO 3 400` | `OK SERVO 3 400` | Mueve un servo dentro de su rango calibrado. |
-| `TALK 3000` | `OK TALK 3000` | Ejecuta un gesto suave de conversación y termina en `BASE`. |
 
 Las direcciones validas son `FORWARD`, `BACKWARD`, `LEFT` y `RIGHT`. La duracion
 esta limitada a 3000 ms y al vencer se ejecuta una parada automatica. Una orden
 invalida de traccion tambien detiene el robot. `STOP` no altera los servos.
 
-`TALK` acepta de 1000 a 5000 ms. Mueve suavemente ojos y cabeza sin bloquear
-la lectura serial; al vencer el tiempo el firmware restaura siempre la pose
-base, incluso si no llega otra orden.
+Los gestos de conversación se programan en ROS, no en este firmware. La ESP32
+permanece como esclavo: recibe únicamente órdenes individuales `SERVO` y
+`BASE`.
 
 ## Carga y prueba
 
