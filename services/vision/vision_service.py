@@ -12,6 +12,7 @@ import os
 import signal
 import time
 from dataclasses import dataclass
+from glob import glob
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Condition, Thread
 from typing import Any
@@ -32,7 +33,7 @@ RUNNING = True
 @dataclass(frozen=True)
 class Settings:
     api_url: str
-    camera_index: int
+    camera_index: str
     width: int
     height: int
     fps: float
@@ -49,7 +50,7 @@ class Settings:
                 "MIMIX_VISION_API_URL",
                 "http://127.0.0.1:4000/api/vision/hand-landmarks",
             ),
-            camera_index=int(os.getenv("MIMIX_CAMERA_INDEX", "0")),
+            camera_index=os.getenv("MIMIX_CAMERA_INDEX", "auto").strip(),
             width=int(os.getenv("MIMIX_CAMERA_WIDTH", "640")),
             height=int(os.getenv("MIMIX_CAMERA_HEIGHT", "480")),
             fps=float(os.getenv("MIMIX_VISION_FPS", "15")),
@@ -66,25 +67,84 @@ def stop_service(_signal: int, _frame: Any) -> None:
     RUNNING = False
 
 
-def open_camera(settings: Settings) -> cv2.VideoCapture:
-    if settings.camera_pipeline:
-        LOGGER.info("Abriendo camara con pipeline GStreamer")
-        camera = cv2.VideoCapture(settings.camera_pipeline, cv2.CAP_GSTREAMER)
-    else:
-        LOGGER.info("Abriendo camara V4L2 en /dev/video%s", settings.camera_index)
-        camera = cv2.VideoCapture(settings.camera_index, cv2.CAP_V4L2)
-
-    if not camera.isOpened():
-        raise RuntimeError(
-            "No se pudo abrir la camara. Verifica MIMIX_CAMERA_INDEX o "
-            "MIMIX_CAMERA_PIPELINE para una camara CSI."
-        )
-
+def configure_camera(camera: cv2.VideoCapture, settings: Settings) -> None:
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, settings.width)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.height)
     camera.set(cv2.CAP_PROP_FPS, settings.fps)
     camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-    return camera
+
+
+def available_camera_indexes(requested_index: str) -> list[int]:
+    detected = sorted({
+        int(device.removeprefix("/dev/video"))
+        for device in glob("/dev/video*")
+        if device.removeprefix("/dev/video").isdigit()
+    })
+    if requested_index.lower() == "auto":
+        return detected
+
+    try:
+        requested = int(requested_index)
+    except ValueError as error:
+        raise ValueError("MIMIX_CAMERA_INDEX debe ser un número o 'auto'.") from error
+    return [requested, *(index for index in detected if index != requested)]
+
+
+def wait_for_first_frame(camera: cv2.VideoCapture, label: str) -> Any | None:
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        ok, frame = camera.read()
+        if ok and frame is not None and frame.size:
+            height, width = frame.shape[:2]
+            LOGGER.info(
+                "Cámara %s entregó imagen %sx%s (brillo medio %.1f)",
+                label,
+                width,
+                height,
+                float(frame.mean()),
+            )
+            return frame
+        time.sleep(0.05)
+    return None
+
+
+def open_camera(settings: Settings) -> tuple[cv2.VideoCapture, Any]:
+    if settings.camera_pipeline:
+        LOGGER.info("Abriendo camara con pipeline GStreamer")
+        camera = cv2.VideoCapture(settings.camera_pipeline, cv2.CAP_GSTREAMER)
+        if not camera.isOpened():
+            raise RuntimeError("No se pudo abrir MIMIX_CAMERA_PIPELINE.")
+        configure_camera(camera, settings)
+        frame = wait_for_first_frame(camera, "CSI")
+        if frame is not None:
+            return camera, frame
+        camera.release()
+        raise RuntimeError("El pipeline CSI abrió, pero no entregó ninguna imagen.")
+
+    candidates = available_camera_indexes(settings.camera_index)
+    if not candidates:
+        raise RuntimeError("No se encontraron dispositivos /dev/video*. Conecta una cámara USB o configura MIMIX_CAMERA_PIPELINE para una CSI.")
+
+    for camera_index in candidates:
+        LOGGER.info("Probando cámara V4L2 en /dev/video%s", camera_index)
+        camera = cv2.VideoCapture(camera_index, cv2.CAP_V4L2)
+        if not camera.isOpened():
+            LOGGER.info("/dev/video%s no se pudo abrir", camera_index)
+            camera.release()
+            continue
+
+        configure_camera(camera, settings)
+        frame = wait_for_first_frame(camera, f"/dev/video{camera_index}")
+        if frame is not None:
+            LOGGER.info("Usando MIMIX_CAMERA_INDEX=%s", camera_index)
+            return camera, frame
+
+        LOGGER.warning("/dev/video%s abrió pero no entregó frames; probando el siguiente", camera_index)
+        camera.release()
+
+    raise RuntimeError(
+        "Ninguna cámara V4L2 entregó imagen. Revisa cable, alimentación y permisos de /dev/video*."
+    )
 
 
 class LatestJpegFrame:
@@ -194,7 +254,7 @@ def run() -> None:
     settings = Settings.from_environment()
     frame_interval = 1 / max(settings.fps, 1)
     video_interval = 1 / max(settings.video_fps, 1)
-    camera = open_camera(settings)
+    camera, first_frame = open_camera(settings)
     session = requests.Session()
     hands_api = mp.solutions.hands
     frame_store = LatestJpegFrame()
@@ -219,7 +279,11 @@ def run() -> None:
         ) as hands:
             while RUNNING:
                 started_at = time.monotonic()
-                ok, frame = camera.read()
+                if first_frame is not None:
+                    ok, frame = True, first_frame
+                    first_frame = None
+                else:
+                    ok, frame = camera.read()
                 if not ok:
                     LOGGER.warning("La camara no entrego un frame; reintentando")
                     time.sleep(0.2)
