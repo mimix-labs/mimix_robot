@@ -34,6 +34,7 @@ class Settings:
     web_url: str
     bridge_token: str | None
     robot_id: str
+    voice_gesture_url: str
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -46,6 +47,9 @@ class Settings:
             web_url=os.getenv("MIMIX_WEB_URL", "http://127.0.0.1:4000").rstrip("/"),
             bridge_token=os.getenv("MIMIX_ROBOT_BRIDGE_TOKEN") or None,
             robot_id=os.getenv("MIMIX_ROBOT_ID", "robot-dev-001"),
+            voice_gesture_url=os.getenv(
+                "MIMIX_VOICE_GESTURE_URL", "http://127.0.0.1:8092/talk"
+            ).rstrip("/"),
         )
 
 
@@ -88,12 +92,44 @@ class MimixWebClient:
         self.session.close()
 
 
+class VoiceGestureClient:
+    """Solicita un gesto local de conversación cuando Wall-E responde."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.url = settings.voice_gesture_url
+        self.session = requests.Session()
+
+    def trigger(self, response: str) -> None:
+        # Estimación deliberadamente limitada: el ESP32 siempre termina en BASE.
+        word_count = max(1, len(response.split()))
+        duration_ms = min(max(word_count * 330, 1500), 5000)
+        try:
+            result = self.session.post(
+                self.url,
+                json={"duration_ms": duration_ms},
+                timeout=0.5,
+            )
+            result.raise_for_status()
+            LOGGER.info("Gesto conversacional solicitado (%s ms)", duration_ms)
+        except requests.RequestException as error:
+            # La voz sigue funcionando aunque ROS no se haya iniciado.
+            LOGGER.warning("No se pudo solicitar el gesto conversacional: %s", error)
+
+    def close(self) -> None:
+        self.session.close()
+
+
 class MimixGuide:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.web = MimixWebClient(settings)
+        self.gestures = VoiceGestureClient(settings)
         self.conversation: Conversation | None = None
         self.session_started = False
+
+    def on_agent_response(self, response: str) -> None:
+        LOGGER.info("Wall-E: %s", response)
+        self.gestures.trigger(response)
 
     def run(self) -> None:
         tools = ClientTools()
@@ -109,7 +145,7 @@ class MimixGuide:
             requires_auth=bool(self.settings.api_key),
             audio_interface=DefaultAudioInterface(),
             client_tools=tools,
-            callback_agent_response=lambda response: LOGGER.info("Wall-E: %s", response),
+            callback_agent_response=self.on_agent_response,
             callback_agent_response_correction=lambda original, corrected: LOGGER.info(
                 "Wall-E corrected: %s -> %s", original, corrected
             ),
@@ -131,6 +167,7 @@ class MimixGuide:
         if self.conversation and self.session_started:
             self.conversation.end_session()
         self.web.close()
+        self.gestures.close()
 
 
 GUIDE: MimixGuide | None = None

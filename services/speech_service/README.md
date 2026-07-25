@@ -62,6 +62,7 @@ MIMIX_ELEVENLABS_AGENT_ID=agent_xxx
 ELEVENLABS_API_KEY=tu_clave_privada
 MIMIX_WEB_URL=http://127.0.0.1:4000
 MIMIX_ROBOT_BRIDGE_TOKEN=un_secreto_local_largo
+MIMIX_VOICE_GESTURE_URL=http://127.0.0.1:8092/talk
 MIMIX_AUDIO_INPUT_SOURCE=alsa_input.usb-...
 MIMIX_AUDIO_OUTPUT_SINK=bluez_output....
 ```
@@ -105,3 +106,10 @@ la conversación. Para revisar que haya una pestaña de Mimix conectada:
 ```bash
 curl http://127.0.0.1:4000/api/robot/status
 ```
+
+## Gestos durante la respuesta
+
+Cuando ElevenLabs comunica una respuesta de Wall-E, el servicio solicita un
+gesto corto al puente ROS local. El puente debe estar iniciado mediante
+`ros2 launch mimix_bringup robot.launch.py` y el robot debe estar armado. Si
+ROS no está iniciado, la conversación de voz continúa sin gestos.

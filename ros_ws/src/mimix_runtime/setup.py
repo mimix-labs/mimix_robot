@@ -24,6 +24,7 @@ setup(
             'behavior = mimix_runtime.behavior_node:main',
             'safety = mimix_runtime.safety_node:main',
             'usb_serial_bridge = mimix_runtime.usb_serial_bridge_node:main',
+            'voice_gesture_bridge = mimix_runtime.voice_gesture_bridge_node:main',
         ],
     },
 )

@@ -54,4 +54,9 @@ def generate_launch_description():
                 },
             ],
         ),
+        Node(
+            package='mimix_runtime',
+            executable='voice_gesture_bridge',
+            name='voice_gesture_bridge',
+        ),
     ])

@@ -8,6 +8,7 @@
     MOVE FORWARD|BACKWARD|LEFT|RIGHT <duracion_ms>
     BASE
     SERVO <1..5> <pulso_calibrado>
+    TALK <duracion_ms>
 
   STOP solo detiene la traccion. Los servos se conservan en su ultima
   posicion hasta que se envie BASE o una nueva orden SERVO.
@@ -30,15 +31,28 @@ const int SCL_I2C = 9;
 const uint8_t PCA9685_ADDRESS = 0x40;
 
 const unsigned long MAX_DURATION_MS = 3000;
+const unsigned long MIN_TALK_DURATION_MS = 1000;
+const unsigned long MAX_TALK_DURATION_MS = 5000;
+const unsigned long TALK_FRAME_INTERVAL_MS = 450;
 const size_t COMMAND_BUFFER_SIZE = 64;
 const uint8_t SERVO_COUNT = 5;
+const uint8_t TALK_FRAME_COUNT = 4;
 
 // Canales PCA9685 0 a 4. Los limites y posiciones base son los calibrados
 // fisicamente para este robot; no son grados.
 const uint8_t SERVO_CHANNELS[SERVO_COUNT] = {0, 1, 2, 3, 4};
 const uint16_t SERVO_MIN_PULSES[SERVO_COUNT] = {180, 400, 180, 150, 150};
 const uint16_t SERVO_MAX_PULSES[SERVO_COUNT] = {320, 480, 600, 300, 400};
-const uint16_t SERVO_BASE_PULSES[SERVO_COUNT] = {180, 480, 375, 150, 400};
+const uint16_t SERVO_BASE_PULSES[SERVO_COUNT] = {180, 480, 400, 150, 400};
+
+// Gestos de conversacion deliberadamente suaves. Cada fila contiene los cinco
+// servos: ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5).
+const uint16_t TALK_FRAMES[TALK_FRAME_COUNT][SERVO_COUNT] = {
+  {210, 455, 370, 175, 375},
+  {190, 470, 430, 160, 390},
+  {225, 445, 395, 185, 365},
+  {180, 480, 400, 150, 400},
+};
 
 Adafruit_PWMServoDriver pca(PCA9685_ADDRESS);
 
@@ -46,6 +60,10 @@ char commandBuffer[COMMAND_BUFFER_SIZE];
 size_t commandLength = 0;
 bool motionActive = false;
 unsigned long motionDeadline = 0;
+bool conversationGestureActive = false;
+unsigned long conversationDeadline = 0;
+unsigned long nextTalkFrameAt = 0;
+uint8_t talkFrameIndex = 0;
 
 void stopMotors() {
   digitalWrite(IN1, LOW);
@@ -102,6 +120,38 @@ void applyBasePose() {
   }
 }
 
+void applyTalkFrame(uint8_t frameIndex) {
+  for (uint8_t index = 0; index < SERVO_COUNT; index++) {
+    pca.setPWM(SERVO_CHANNELS[index], 0, TALK_FRAMES[frameIndex][index]);
+  }
+}
+
+void startConversationGesture(unsigned long durationMs) {
+  conversationGestureActive = true;
+  conversationDeadline = millis() + durationMs;
+  nextTalkFrameAt = 0;
+  talkFrameIndex = 0;
+}
+
+void updateConversationGesture() {
+  if (!conversationGestureActive) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (static_cast<long>(now - conversationDeadline) >= 0) {
+    conversationGestureActive = false;
+    applyBasePose();
+    return;
+  }
+
+  if (nextTalkFrameAt == 0 || static_cast<long>(now - nextTalkFrameAt) >= 0) {
+    applyTalkFrame(talkFrameIndex);
+    talkFrameIndex = (talkFrameIndex + 1) % TALK_FRAME_COUNT;
+    nextTalkFrameAt = now + TALK_FRAME_INTERVAL_MS;
+  }
+}
+
 void processCommand(char* command) {
   if (strcmp(command, "PING") == 0) {
     Serial.println("PONG MIMIX_ROBOT_V3");
@@ -113,6 +163,7 @@ void processCommand(char* command) {
     return;
   }
   if (strcmp(command, "BASE") == 0) {
+    conversationGestureActive = false;
     applyBasePose();
     Serial.println("OK BASE");
     return;
@@ -121,6 +172,7 @@ void processCommand(char* command) {
   int servoNumber = 0;
   int pulse = 0;
   if (sscanf(command, "SERVO %d %d", &servoNumber, &pulse) == 2) {
+    conversationGestureActive = false;
     if (!setServoPulse(servoNumber, pulse)) {
       Serial.println("ERR SERVO_OUT_OF_RANGE");
       return;
@@ -129,6 +181,18 @@ void processCommand(char* command) {
     Serial.print(servoNumber);
     Serial.print(' ');
     Serial.println(pulse);
+    return;
+  }
+
+  long talkDurationMs = 0;
+  if (sscanf(command, "TALK %ld", &talkDurationMs) == 1) {
+    if (talkDurationMs < MIN_TALK_DURATION_MS || talkDurationMs > MAX_TALK_DURATION_MS) {
+      Serial.println("ERR TALK_OUT_OF_RANGE");
+      return;
+    }
+    startConversationGesture(static_cast<unsigned long>(talkDurationMs));
+    Serial.print("OK TALK ");
+    Serial.println(talkDurationMs);
     return;
   }
 
@@ -192,6 +256,7 @@ void setup() {
 
 void loop() {
   readSerialCommands();
+  updateConversationGesture();
   if (motionActive && static_cast<long>(millis() - motionDeadline) >= 0) {
     stopMotors();
     Serial.println("EVENT MOTION_TIMEOUT STOP");
