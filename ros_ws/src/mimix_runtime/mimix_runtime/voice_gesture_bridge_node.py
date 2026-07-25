@@ -18,17 +18,19 @@ class VoiceGestureBridge(Node):
 
     MIN_DURATION_MS = 1000
     MAX_DURATION_MS = 10000
-    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5). Cada pose lleva
-    # su propia pausa: el robot se mueve, sostiene el gesto y vuelve a base
-    # antes de hacer el siguiente. Los valores aprovechan los rangos
-    # calibrados sin llegar a los topes mecánicos.
+    # La base es la mirada directa al estudiante. S1/S2 tienen amplitud
+    # suficiente para resultar visibles; S3 gira a los lados. S4/S5 solo
+    # acompañan con un cabeceo leve para no llevar la mirada hacia abajo.
+    # Las poses intermedias hacen que cada desplazamiento sea escalonado.
     TALK_FRAMES = (
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.8),
-        (((1, 265), (2, 425), (3, 280), (4, 235), (5, 270)), 1.6),
+        (((1, 220), (2, 455), (3, 365), (4, 162), (5, 392)), 0.55),
+        (((1, 260), (2, 430), (3, 330), (4, 180), (5, 370)), 1.35),
+        (((1, 220), (2, 455), (3, 365), (4, 162), (5, 392)), 0.55),
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
-        (((1, 285), (2, 415), (3, 520), (4, 260), (5, 230)), 1.8),
-        (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
-        (((1, 235), (2, 445), (3, 400), (4, 220), (5, 290)), 1.5),
+        (((1, 225), (2, 450), (3, 435), (4, 164), (5, 388)), 0.55),
+        (((1, 270), (2, 420), (3, 470), (4, 185), (5, 365)), 1.35),
+        (((1, 225), (2, 450), (3, 435), (4, 164), (5, 388)), 0.55),
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
     )
 
