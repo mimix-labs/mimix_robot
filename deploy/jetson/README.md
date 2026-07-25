@@ -22,6 +22,10 @@ bash deploy/jetson/start_mimix.sh --physical
 puerto serial o el puerto local `8092` ya está ocupado, el lanzador se detiene
 sin mover el robot y explica cómo corregirlo. No carga firmware.
 
+La visión se inicia en segundo plano, pero no bloquea la voz, ROS ni la Web.
+Si la cámara no publica frames, Chromium abre `http://127.0.0.1:5173/` en modo
+normal y el problema queda registrado en `logs/jetson/vision.log`.
+
 `--ros` inicia ROS en simulación segura y desarmada. `--voice` inicia solo la
 voz. Usa `--no-browser` al ejecutarlo por SSH o para diagnóstico remoto, y
 `--skip-ros-build` en reinicios posteriores cuando el workspace no cambió. Los

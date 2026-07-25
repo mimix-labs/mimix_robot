@@ -12,6 +12,7 @@ START_ROS=false
 START_BROWSER=true
 PHYSICAL_MODE=false
 SKIP_ROS_BUILD=false
+VISION_READY=false
 PIDS=()
 
 usage() {
@@ -187,8 +188,9 @@ wait_for_native_vision() {
     attempts=$((attempts - 1))
   done
 
-  echo "La visión no publicó frames nativos a tiempo. Revisa $LOG_DIR/vision.log." >&2
-  exit 1
+  echo "Aviso: la visión no publicó frames nativos. Se continuará sin bloquear voz ni ROS." >&2
+  echo "Revisa $LOG_DIR/vision.log para corregir cámara o MediaPipe." >&2
+  return 1
 }
 
 run_web_server() {
@@ -230,7 +232,9 @@ start_process "web-client" run_web_client
 wait_for_url "http://127.0.0.1:5173/" "Mimix Web client"
 
 start_process "vision" bash "$ROBOT_DIR/services/vision/start_vision.sh"
-wait_for_native_vision
+if wait_for_native_vision; then
+  VISION_READY=true
+fi
 
 if [[ "$START_BROWSER" == true ]]; then
   if [[ -z "${DISPLAY:-}" ]]; then
@@ -242,6 +246,10 @@ if [[ "$START_BROWSER" == true ]]; then
       echo "No se encontró $CHROMIUM_BIN. Define MIMIX_CHROMIUM_BIN en $ENV_FILE." >&2
       exit 1
     fi
+    BROWSER_URL="http://127.0.0.1:5173/"
+    if [[ "$VISION_READY" == true ]]; then
+      BROWSER_URL+="?vision=robot"
+    fi
     start_process "chromium" "$CHROMIUM_BIN" \
       --user-data-dir="$CHROMIUM_PROFILE" \
       --use-gl=angle \
@@ -251,7 +259,7 @@ if [[ "$START_BROWSER" == true ]]; then
       --enable-gpu-rasterization \
       --no-first-run \
       --no-default-browser-check \
-      "http://127.0.0.1:5173/?vision=robot"
+      "$BROWSER_URL"
   fi
 fi
 
