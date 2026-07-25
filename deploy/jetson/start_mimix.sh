@@ -232,6 +232,7 @@ start_process "web-client" run_web_client
 wait_for_url "http://127.0.0.1:5173/" "Mimix Web client"
 
 start_process "vision" bash "$ROBOT_DIR/services/vision/start_vision.sh"
+ensure_last_process_is_running "vision"
 if wait_for_native_vision; then
   VISION_READY=true
 fi
@@ -247,7 +248,10 @@ if [[ "$START_BROWSER" == true ]]; then
       exit 1
     fi
     BROWSER_URL="http://127.0.0.1:5173/"
-    if [[ "$VISION_READY" == true ]]; then
+    # En la demostración física el navegador se conecta al canal nativo desde
+    # el inicio. Si la cámara tarda en enumerarse, EventSource y MJPEG se
+    # reconectan cuando el supervisor de visión logra abrirla.
+    if [[ "$VISION_READY" == true || "$PHYSICAL_MODE" == true ]]; then
       BROWSER_URL+="?vision=robot"
     fi
     start_process "chromium" "$CHROMIUM_BIN" \
