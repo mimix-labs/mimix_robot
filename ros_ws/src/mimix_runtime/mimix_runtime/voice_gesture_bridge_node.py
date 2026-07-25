@@ -17,21 +17,19 @@ class VoiceGestureBridge(Node):
     """La voz solicita duración; ROS programa los servos y finaliza en BASE."""
 
     MIN_DURATION_MS = 1000
-    MAX_DURATION_MS = 7000
-    FRAME_INTERVAL_SECONDS = 0.70
-    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5). Las variaciones
-    # pequeñas entre cuadros permiten que los servos lleguen suavemente.
+    MAX_DURATION_MS = 10000
+    # Ojos (1 y 2), giro de cabeza (3) y cabeceo (4 y 5). Cada pose lleva
+    # su propia pausa: el robot se mueve, sostiene el gesto y vuelve a base
+    # antes de hacer el siguiente. Los valores aprovechan los rangos
+    # calibrados sin llegar a los topes mecánicos.
     TALK_FRAMES = (
-        ((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)),
-        ((1, 186), (2, 474), (3, 395), (4, 156), (5, 394)),
-        ((1, 194), (2, 466), (3, 385), (4, 164), (5, 386)),
-        ((1, 202), (2, 458), (3, 372), (4, 172), (5, 378)),
-        ((1, 196), (2, 464), (3, 382), (4, 166), (5, 384)),
-        ((1, 210), (2, 455), (3, 370), (4, 175), (5, 375)),
-        ((1, 198), (2, 462), (3, 405), (4, 166), (5, 384)),
-        ((1, 190), (2, 470), (3, 420), (4, 160), (5, 390)),
-        ((1, 184), (2, 476), (3, 410), (4, 154), (5, 396)),
-        ((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)),
+        (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.8),
+        (((1, 265), (2, 425), (3, 280), (4, 235), (5, 270)), 1.6),
+        (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
+        (((1, 285), (2, 415), (3, 520), (4, 260), (5, 230)), 1.8),
+        (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
+        (((1, 235), (2, 445), (3, 400), (4, 220), (5, 290)), 1.5),
+        (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
     )
 
     def __init__(self):
@@ -112,9 +110,11 @@ class VoiceGestureBridge(Node):
         self.motion_publisher.publish(request)
 
     def publish_frame(self):
-        for servo_number, pulse in self.TALK_FRAMES[self.frame_index]:
+        frame, pause_seconds = self.TALK_FRAMES[self.frame_index]
+        for servo_number, pulse in frame:
             self.publish_request(f'servo_{servo_number}', {'pulse': pulse})
         self.frame_index = (self.frame_index + 1) % len(self.TALK_FRAMES)
+        return pause_seconds
 
     def start_or_extend_gesture(self, duration_ms):
         now = time.monotonic()
@@ -146,8 +146,7 @@ class VoiceGestureBridge(Node):
             return
 
         if now >= self.next_frame_at:
-            self.publish_frame()
-            self.next_frame_at = now + self.FRAME_INTERVAL_SECONDS
+            self.next_frame_at = now + self.publish_frame()
 
     def destroy_node(self):
         if self.gesture_active:

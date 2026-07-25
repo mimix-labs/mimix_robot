@@ -139,7 +139,7 @@ class VoiceGestureClient:
     def trigger(self, response: str) -> None:
         # Estimación deliberadamente limitada: el ESP32 siempre termina en BASE.
         word_count = max(1, len(response.split()))
-        duration_ms = min(max(word_count * 420, 3500), 7000)
+        duration_ms = min(max(word_count * 500, 5000), 10000)
         try:
             result = self.session.post(
                 self.url,

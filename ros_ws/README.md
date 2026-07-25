@@ -125,8 +125,9 @@ calibrados en el firmware; ROS y el ESP32 rechazan un valor fuera de rango.
 
 El lanzamiento ROS incluye un puente local en `http://127.0.0.1:8092/talk`.
 El servicio de voz de Wall-E lo llama automáticamente al comenzar una respuesta
-de ElevenLabs. El gesto pasa por `safety_node`, dura entre tres y siete segundos
-y ROS envía `BASE` al terminar.
+de ElevenLabs. El gesto pasa por `safety_node`, dura entre cinco y diez segundos
+y ROS envía `BASE` al terminar. Cada pose se sostiene brevemente antes de que
+el robot vuelva a base y haga el siguiente gesto.
 
 Para probarlo sin voz, con ROS armado:
 
