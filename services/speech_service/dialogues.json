@@ -1,5 +1,5 @@
 {
-  "description": "Diálogos configurables de Wall-E. Edita este archivo para cambiar lo que dice el robot.",
+  "description": "Diálogos deterministas de Wall-E. destination es opcional y solo permite world, mathematics o science.",
   "dialogues": [
     {
       "id": "presentate",
@@ -12,33 +12,66 @@
         "como te llamas",
         "dime tu nombre"
       ],
-      "response": "¡Hola! Soy Wall-E, el robot educativo de Mimix. Estoy aquí para ayudarte a aprender sobre tecnología, ciencia y matemáticas. ¿En qué quieres que te ayude hoy?"
+      "response": "Hola. Soy Wall-E, tu compañero en esta aventura. Aquí, aprender es un videojuego: cada mapa es una misión, cada reto es un descubrimiento. Camino a tu lado, con la metodología STEAM. ¿Listos? ¡Empecemos!"
     },
-
     {
-      "id": "aprender_matematicas",
-      "keywords": [
-        "quiero aprender matemáticas",
-        "quiero aprender matematicas",
-        "matemáticas",
-        "matematicas",
-        "aprender mates"
-      ],
-      "response": "¡Qué bien! Las matemáticas son increíbles. Con los números podemos resolver problemas, medir el mundo y hasta viajar al espacio. ¿Quieres explorar alguna misión de matemáticas?"
-    },
-
-    {
-      "id": "aprender_ciencias",
+      "id": "demo_ciencias",
       "keywords": [
         "quiero aprender ciencias",
         "quiero aprender ciencia",
+        "vamos a ciencias",
+        "llévame a ciencias",
+        "llevame a ciencias",
+        "aprender ciencias",
+        "aprender ciencia",
         "ciencias",
-        "ciencia",
-        "aprender ciencia"
+        "ciencia"
       ],
-      "response": "¡La ciencia es fascinante! Nos ayuda a entender cómo funciona todo: desde las estrellas hasta las plantas. ¿Te gustaría hacer una misión de ciencias?"
+      "destination": "science",
+      "response": "¡Perfecto! Vamos al mundo de Ciencias y a la misión de Química de tu izquierda."
     },
-
+    {
+      "id": "demo_mision_quimica",
+      "keywords": [
+        "misión de química",
+        "mision de quimica",
+        "misión química",
+        "mision quimica",
+        "aprender química",
+        "aprender quimica",
+        "química",
+        "quimica"
+      ],
+      "response": "¡Excelente! En esta misión aprenderás a reconocer cómo están compuestos los elementos con sus diversas partículas. Con la mano izquierda, toma el elemento. Colócalo al centro... y con la derecha... ¡gíralo! Así es como un átomo... cobra vida en tus manos."
+    },
+    {
+      "id": "demo_matematicas",
+      "keywords": [
+        "quiero aprender matemáticas",
+        "quiero aprender matematicas",
+        "vamos a matemáticas",
+        "vamos a matematicas",
+        "llévame a matemáticas",
+        "llevame a matematicas",
+        "aprender matemáticas",
+        "aprender matematicas",
+        "matemáticas",
+        "matematicas"
+      ],
+      "destination": "mathematics",
+      "response": "¡Excelente! Ese mundo se encuentra a la derecha."
+    },
+    {
+      "id": "demo_matematicas_bienvenida",
+      "keywords": [
+        "qué aprendemos en matemáticas",
+        "que aprendemos en matematicas",
+        "explícame matemáticas",
+        "explicame matematicas",
+        "unidades decenas centenas"
+      ],
+      "response": "¡Bravo! Ahora estás en el mundo de las Matemáticas. Aquí superaremos juntos: unidades, decenas, centenas."
+    },
     {
       "id": "mision_m1_sumar",
       "keywords": [
@@ -49,7 +82,6 @@
       ],
       "response": "¡Vamos a aprender a sumar! La suma es juntar cantidades. Por ejemplo, si tienes 2 manzanas y te dan 3 más, ahora tienes 5. ¿Quieres intentar un ejercicio?"
     },
-
     {
       "id": "mision_m2_restar",
       "keywords": [
@@ -60,7 +92,6 @@
       ],
       "response": "¡Hora de restar! Restar es quitar una cantidad de otra. Si tienes 5 dulces y te comes 2, te quedan 3. ¿Practicamos juntos?"
     },
-
     {
       "id": "mision_c1_plantas",
       "keywords": [
@@ -71,7 +102,6 @@
       ],
       "response": "¡Las plantas son seres vivos increíbles! Fabrican su propio alimento con la luz del sol, y nos dan oxígeno para respirar. ¿Sabías que hay más de 300 mil especies de plantas en el mundo?"
     },
-
     {
       "id": "mision_c2_estrellas",
       "keywords": [
@@ -82,6 +112,17 @@
         "espacio"
       ],
       "response": "¡El espacio es enorme! Las estrellas son como nuestro Sol pero muy lejanas. Algunas son cien veces más grandes que el Sol. La estrella más cercana está a 4 años luz. ¿Quieres saber más?"
+    },
+    {
+      "id": "cierre_demo",
+      "keywords": [
+        "gracias wall-e",
+        "gracias wally",
+        "despídete",
+        "despidete",
+        "terminamos"
+      ],
+      "response": "¡Gracias por aprender con nosotros!"
     }
   ]
 }

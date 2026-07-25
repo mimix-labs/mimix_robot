@@ -12,7 +12,7 @@ Hay tres funciones permitidas:
 | --- | --- | --- |
 | `get_mimix_context` | ninguno | Consulta en qué zona o reto está Mimix Web. |
 | `navigate_to` | `destination` = `world`, `mathematics` o `science` | Solicita abrir uno de esos destinos. |
-| `get_dialogue` | `keyword` = palabra clave del estudiante | Busca en `dialogues.json` y devuelve el texto exacto del diálogo. |
+| `get_dialogue` | `keyword` = frase completa del estudiante | Busca en `dialogues.json`; devuelve el texto exacto y, si aplica, un destino semántico. |
 
 El LLM no recibe permisos para ejecutar URLs, JavaScript, terminal ni control
 de motores. Mimix Web valida los destinos y el navegador realiza la navegación.
@@ -23,19 +23,21 @@ Los diálogos predefinidos se editan en `dialogues.json`. Cada entrada tiene:
 
 ```json
 {
-  "id": "aprender_matematicas",
-  "keywords": ["quiero aprender matemáticas", "matematicas"],
-  "response": "¡Qué bien! Las matemáticas son increíbles..."
+  "id": "demo_ciencias",
+  "keywords": ["quiero aprender ciencias", "ciencias"],
+  "destination": "science",
+  "response": "¡Perfecto! Vamos al mundo de Ciencias y a la misión de Química de tu izquierda."
 }
 ```
 
 - **id**: identificador único (no se usa en runtime, solo para organizar)
-- **keywords**: lista de frases que disparan este diálogo (sin acentos ni mayúsculas)
+- **keywords**: lista de frases que disparan este diálogo; la comparación ignora acentos y mayúsculas
+- **destination**: opcional; solo `world`, `mathematics` o `science`
 - **response**: texto exacto que dirá Wall-E
 
-El agente debe llamar a `get_dialogue` con la palabra clave extraída del mensaje
-del estudiante. Si `found` es `true`, debe repetir el texto de `response` textualmente.
-Si `found` es `false`, debe responder con su comportamiento normal de conversación.
+El agente llama a `get_dialogue` con la frase completa del estudiante. Si `found`
+es `true` y aparece `destination`, primero navega al destino y recién entonces
+repite `response` textualmente. Si `found` es `false`, usa su conversación libre.
 
 ## Configurar ElevenLabs
 
@@ -47,30 +49,21 @@ Si `found` es `false`, debe responder con su comportamiento normal de conversaci
    Describe que acepta solamente `world`, `mathematics` o `science`.
 5. `get_dialogue` lleva un parámetro obligatorio de texto: `keyword`.
    Describe que acepta la palabra clave del estudiante (ej. "preséntate", "matemáticas").
-6. Agrega al mensaje del sistema del agente:
+6. Deja activada la espera de respuesta para las tres herramientas y confirma
+   que los nombres y parámetros coinciden exactamente con el código.
 
-```text
-## HERRAMIENTAS DISPONIBLES
+El prompt fuente está en `system_prompt.md`. Para publicarlo de forma repetible
+en el agente configurado en `.env`, ejecuta desde la Jetson:
 
-- get_mimix_context: consulta en qué zona o reto está el estudiante.
-- navigate_to: navega a world, mathematics o science.
-- get_dialogue: busca diálogos predefinidos por palabra clave. Recibe un parámetro "keyword".
-  Si found=true, DEBES repetir el texto de "response" textualmente, sin modificarlo.
-  Si found=false, responde con tu comportamiento normal.
-
-Cuando el estudiante use frases como "preséntate", "quiero aprender matemáticas",
-"misión sumar", etc., llama primero a get_dialogue. Si encuentra el diálogo,
-repite el texto exacto. Si no lo encuentra, conversa normalmente.
-
-Cuando el estudiante pida ir a Matemáticas, Ciencias o volver al mundo, usa
-la herramienta navigate_to con el destino permitido. Espera su resultado antes
-de confirmar que la navegación ocurrió.
-
-SOLO responde si el mensaje contiene tu nombre "Wall-E" o "Wally".
-Si no te llaman por tu nombre, quédate en silencio.
+```bash
+cd ~/mimix_robot
+source services/speech_service/.venv/bin/activate
+python services/speech_service/sync_elevenlabs_prompt.py --dry-run
+python services/speech_service/sync_elevenlabs_prompt.py
 ```
 
-Publica el agente después de crear las herramientas. La clave de API nunca se
+El sincronizador obtiene la configuración actual, conserva sus IDs de
+herramientas Client y actualiza únicamente el prompt. La clave de API nunca se
 copia en el navegador ni en Git.
 
 ## Arranque en Jetson

@@ -115,7 +115,7 @@ ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "
 Después prueba **un solo servo por vez**. Por ejemplo, el servo 3 centrado:
 
 ```bash
-ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "{id: 'servo-3-center', action: 'servo_3', max_duration_ms: 100, payload_json: '{\"pulse\": 375}'}"
+ros2 topic pub --once /mimix/motion/request mimix_interfaces/msg/MotionRequest "{id: 'servo-3-center', action: 'servo_3', max_duration_ms: 100, payload_json: '{\"pulse\": 400}'}"
 ```
 
 Las acciones válidas son `servo_1` a `servo_5`. Los rangos permitidos son los

@@ -8,18 +8,18 @@ Nunca ejecuta URLs, JavaScript ni comandos de hardware solicitados por el LLM.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import signal
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import requests
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import ClientTools, Conversation
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+
+from dialogue_manager import DialogueManager
 
 
 logging.basicConfig(
@@ -53,41 +53,6 @@ class Settings:
                 "MIMIX_VOICE_GESTURE_URL", "http://127.0.0.1:8092/talk"
             ).rstrip("/"),
         )
-
-
-class DialogueManager:
-    """Carga y consulta los diálogos configurables desde dialogues.json."""
-
-    def __init__(self, dialogues_path: Path | None = None) -> None:
-        if dialogues_path is None:
-            dialogues_path = Path(__file__).resolve().parent / "dialogues.json"
-        self.dialogues_path = dialogues_path
-        self.dialogues: list[dict[str, Any]] = []
-        self._reload()
-
-    def _reload(self) -> None:
-        try:
-            data = json.loads(self.dialogues_path.read_text(encoding="utf-8"))
-            self.dialogues = data.get("dialogues", [])
-            LOGGER.info("Diálogos cargados: %d entradas", len(self.dialogues))
-        except Exception:
-            LOGGER.exception("No se pudieron cargar los diálogos desde %s", self.dialogues_path)
-            self.dialogues = []
-
-    def get_dialogue(self, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
-        keyword = ((parameters or {}).get("keyword") or "").strip().lower()
-        if not keyword:
-            return {"found": False, "response": ""}
-
-        for dialogue in self.dialogues:
-            for kw in dialogue.get("keywords", []):
-                kw_lower = kw.lower()
-                if kw_lower in keyword or keyword in kw_lower:
-                    LOGGER.info("Diálogo encontrado: %s -> %s", dialogue["id"], keyword)
-                    return {"found": True, "response": dialogue["response"]}
-
-        LOGGER.info("Ningún diálogo coincide con: %s", keyword)
-        return {"found": False, "response": ""}
 
 
 class MimixWebClient:
