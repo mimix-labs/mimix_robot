@@ -250,6 +250,7 @@ run_web_client() {
 run_ros() {
   local dry_run=true
   local armed=false
+  local -a launch_args
 
   if [[ "$PHYSICAL_MODE" == true ]]; then
     dry_run=false
@@ -258,13 +259,17 @@ run_ros() {
 
   source_ros_setup "$ROS_SETUP"
   source_ros_setup "$ROS_WORKSPACE/install/setup.bash"
-  exec ros2 launch mimix_bringup robot.launch.py \
-    "web_url:=$WEB_URL" \
-    "bridge_token:=${MIMIX_ROBOT_BRIDGE_TOKEN:-}" \
-    "serial_port:=$SERIAL_PORT" \
-    "serial_baud:=$SERIAL_BAUD" \
-    "dry_run:=$dry_run" \
+  launch_args=(
+    "web_url:=$WEB_URL"
+    "serial_port:=$SERIAL_PORT"
+    "serial_baud:=$SERIAL_BAUD"
+    "dry_run:=$dry_run"
     "armed:=$armed"
+  )
+  if [[ -n "${MIMIX_ROBOT_BRIDGE_TOKEN:-}" ]]; then
+    launch_args+=("bridge_token:=$MIMIX_ROBOT_BRIDGE_TOKEN")
+  fi
+  exec ros2 launch mimix_bringup robot.launch.py "${launch_args[@]}"
 }
 
 start_process "web-server" run_web_server
