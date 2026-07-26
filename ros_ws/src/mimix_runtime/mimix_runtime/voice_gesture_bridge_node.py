@@ -20,10 +20,12 @@ class VoiceGestureBridge(Node):
     MAX_DURATION_MS = 10000
     # El firmware actual solo admite encendido/dirección para las ruedas: no
     # tiene PWM para regular velocidad. Por eso el vaivén usa la pulsación
-    # mínima permitida y ocurre una sola vez por cada respuesta de Wall-E.
+    # mínima permitida. Durante la respuesta repite el vaivén cada 2.5 s.
     WHEEL_PULSE_MS = 100
-    WHEEL_FORWARD_DELAY_S = 0.25
-    WHEEL_BACKWARD_DELAY_S = 0.75
+    WHEEL_START_DELAY_S = 0.25
+    WHEEL_RETURN_DELAY_S = 0.50
+    WHEEL_CYCLE_INTERVAL_S = 2.50
+    WHEEL_DEADLINE_MARGIN_S = 0.20
     # La base es la mirada directa al estudiante. S1/S2 tienen amplitud
     # suficiente para resultar visibles; S3 gira a los lados. S4/S5 solo
     # acompañan con un cabeceo leve para no llevar la mirada hacia abajo.
@@ -139,14 +141,26 @@ class VoiceGestureBridge(Node):
             self.gesture_active = True
             self.frame_index = 0
             self.next_frame_at = now
-            self.scheduled_wheel_actions = [
-                (now + self.WHEEL_FORWARD_DELAY_S, 'forward'),
-                (now + self.WHEEL_BACKWARD_DELAY_S, 'backward'),
-            ]
+            self.scheduled_wheel_actions = self.wheel_actions_for_duration(
+                now, duration_ms
+            )
         self.gesture_deadline = max(self.gesture_deadline, deadline)
         self.status_publisher.publish(status(
             'voice_gesture_bridge', 'gesture_requested', f'{duration_ms} ms',
         ))
+
+    def wheel_actions_for_duration(self, started_at, duration_ms):
+        """Programa pares adelante/atrás que siempre finalizan antes del gesto."""
+        deadline = started_at + duration_ms / 1000.0 - self.WHEEL_DEADLINE_MARGIN_S
+        forward_at = started_at + self.WHEEL_START_DELAY_S
+        actions = []
+        while forward_at + self.WHEEL_RETURN_DELAY_S <= deadline:
+            actions.extend((
+                (forward_at, 'forward'),
+                (forward_at + self.WHEEL_RETURN_DELAY_S, 'backward'),
+            ))
+            forward_at += self.WHEEL_CYCLE_INTERVAL_S
+        return actions
 
     def update_gesture(self):
         while True:

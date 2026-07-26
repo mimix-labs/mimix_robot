@@ -143,10 +143,11 @@ y ROS envía `BASE` al terminar. Cada pose se sostiene brevemente antes de que
 el robot vuelva a base y haga el siguiente gesto.
 
 Durante una respuesta, S4/S5 realizan un cabeceo suave dentro de su calibración.
-También se programa una sola pulsación de ruedas hacia delante de 100 ms y, 500 ms
-después, otra hacia atrás de 100 ms. El firmware actual no tiene control PWM, por
-lo que esto limita la distancia recorrida, pero no la velocidad instantánea. Para
-regular velocidad se requeriría un cambio y carga de firmware por separado.
+También se programan pulsaciones de ruedas hacia delante de 100 ms y, 500 ms
+después, hacia atrás de 100 ms cada 2.5 segundos mientras Wall-E habla. El
+firmware actual no tiene control PWM, por lo que esto limita la distancia
+recorrida, pero no la velocidad instantánea. Para regular velocidad se
+requeriría un cambio y carga de firmware por separado.
 
 Para probarlo sin voz, con ROS armado:
 
