@@ -46,8 +46,12 @@ configure_pulse_device() {
 configure_pulse_device "sources" "${MIMIX_AUDIO_INPUT_SOURCE:-}" "set-default-source"
 configure_pulse_device "sinks" "${MIMIX_AUDIO_OUTPUT_SINK:-}" "set-default-sink"
 
-echo "Aplicando configuracion de Wall-E sin interrupciones..."
-"$PYTHON_BIN" "$SERVICE_DIR/sync_elevenlabs_prompt.py" --env-file "$ENV_FILE"
+if [[ -n "${MIMIX_ELEVENLABS_AGENT_ID:-}" && -n "${ELEVENLABS_API_KEY:-}" ]]; then
+  echo "Aplicando configuracion de Wall-E sin interrupciones..."
+  "$PYTHON_BIN" "$SERVICE_DIR/sync_elevenlabs_prompt.py" --env-file "$ENV_FILE"
+else
+  echo "Aviso: no se sincronizo ElevenLabs porque falta ELEVENLABS_API_KEY; la voz iniciara normalmente." >&2
+fi
 
 echo "Iniciando Wall-E. Presiona Ctrl+C para detenerlo."
 exec "$PYTHON_BIN" "$SERVICE_DIR/elevenlabs_service.py"

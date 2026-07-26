@@ -112,8 +112,9 @@ pactl list short sinks
 ```
 
 Luego inicia el servicio con un único comando. El lanzador carga `.env`,
-selecciona los dispositivos configurados, sincroniza la configuración sin
-interrupciones y arranca Wall-E:
+selecciona los dispositivos configurados y arranca Wall-E. Si también tiene
+`ELEVENLABS_API_KEY`, sincroniza antes la configuración sin interrupciones; si
+la clave no está presente, la voz sigue iniciando normalmente:
 
 ```bash
 cd ~/mimix_robot
