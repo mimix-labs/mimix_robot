@@ -8,6 +8,7 @@ Nunca ejecuta URLs, JavaScript ni comandos de hardware solicitados por el LLM.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import signal
@@ -134,13 +135,34 @@ class MimixGuide:
         LOGGER.info("Wall-E: %s", response)
         self.gestures.trigger(response)
 
+    @staticmethod
+    def _client_tool_result(result: dict[str, Any]) -> str:
+        """Serializa el resultado para el protocolo de Client Tools de ElevenLabs.
+
+        El SDK reenvía este valor al agente a través de WebSocket. Enviar un
+        diccionario Python directamente provoca que el servidor rechace el
+        mensaje; una cadena JSON conserva todos los campos para el agente.
+        """
+        return json.dumps(result, ensure_ascii=False)
+
+    def get_mimix_context(
+        self, parameters: dict[str, Any] | None = None
+    ) -> str:
+        return self._client_tool_result(self.web.get_context(parameters))
+
+    def navigate_to(self, parameters: dict[str, Any] | None = None) -> str:
+        return self._client_tool_result(self.web.navigate_to(parameters))
+
+    def get_dialogue(self, parameters: dict[str, Any] | None = None) -> str:
+        return self._client_tool_result(self.dialogues.get_dialogue(parameters))
+
     def run(self) -> None:
         tools = ClientTools()
         # Estos nombres deben coincidir exactamente con las herramientas Client
         # configuradas en el panel de ElevenLabs.
-        tools.register("get_mimix_context", self.web.get_context)
-        tools.register("navigate_to", self.web.navigate_to)
-        tools.register("get_dialogue", self.dialogues.get_dialogue)
+        tools.register("get_mimix_context", self.get_mimix_context)
+        tools.register("navigate_to", self.navigate_to)
+        tools.register("get_dialogue", self.get_dialogue)
 
         client = ElevenLabs(api_key=self.settings.api_key)
         self.conversation = Conversation(
@@ -169,7 +191,13 @@ class MimixGuide:
         # No intentes detener la interfaz de audio si start_session falló
         # antes de inicializarla.
         if self.conversation and self.session_started:
-            self.conversation.end_session()
+            # El callback de audio y el bloque finally pueden intentar cerrar
+            # la misma sesión. Solo el primer cierre debe tocar PyAudio.
+            self.session_started = False
+            try:
+                self.conversation.end_session()
+            except OSError as error:
+                LOGGER.debug("La interfaz de audio ya estaba cerrada: %s", error)
         self.web.close()
         self.gestures.close()
 
