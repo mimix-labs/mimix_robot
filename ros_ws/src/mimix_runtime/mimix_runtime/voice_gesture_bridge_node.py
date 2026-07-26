@@ -18,19 +18,25 @@ class VoiceGestureBridge(Node):
 
     MIN_DURATION_MS = 1000
     MAX_DURATION_MS = 10000
+    # El firmware actual solo admite encendido/dirección para las ruedas: no
+    # tiene PWM para regular velocidad. Por eso el vaivén usa la pulsación
+    # mínima permitida y ocurre una sola vez por cada respuesta de Wall-E.
+    WHEEL_PULSE_MS = 100
+    WHEEL_FORWARD_DELAY_S = 0.25
+    WHEEL_BACKWARD_DELAY_S = 0.75
     # La base es la mirada directa al estudiante. S1/S2 tienen amplitud
     # suficiente para resultar visibles; S3 gira a los lados. S4/S5 solo
     # acompañan con un cabeceo leve para no llevar la mirada hacia abajo.
     # Las poses intermedias hacen que cada desplazamiento sea escalonado.
     TALK_FRAMES = (
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.8),
-        (((1, 220), (2, 455), (3, 365), (4, 162), (5, 392)), 0.55),
-        (((1, 260), (2, 430), (3, 330), (4, 180), (5, 370)), 1.35),
-        (((1, 220), (2, 455), (3, 365), (4, 162), (5, 392)), 0.55),
+        (((1, 220), (2, 455), (3, 365), (4, 170), (5, 382)), 0.55),
+        (((1, 260), (2, 430), (3, 330), (4, 195), (5, 355)), 1.35),
+        (((1, 220), (2, 455), (3, 365), (4, 170), (5, 382)), 0.55),
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
-        (((1, 225), (2, 450), (3, 435), (4, 164), (5, 388)), 0.55),
-        (((1, 270), (2, 420), (3, 470), (4, 185), (5, 365)), 1.35),
-        (((1, 225), (2, 450), (3, 435), (4, 164), (5, 388)), 0.55),
+        (((1, 225), (2, 450), (3, 435), (4, 172), (5, 380)), 0.55),
+        (((1, 270), (2, 420), (3, 470), (4, 200), (5, 350)), 1.35),
+        (((1, 225), (2, 450), (3, 435), (4, 172), (5, 380)), 0.55),
         (((1, 180), (2, 480), (3, 400), (4, 150), (5, 400)), 0.9),
     )
 
@@ -49,6 +55,7 @@ class VoiceGestureBridge(Node):
         self.gesture_deadline = 0.0
         self.next_frame_at = 0.0
         self.frame_index = 0
+        self.scheduled_wheel_actions = []
         self.request_sequence = 0
 
         try:
@@ -109,12 +116,12 @@ class VoiceGestureBridge(Node):
 
         return GestureRequestHandler
 
-    def publish_request(self, action, payload=None):
+    def publish_request(self, action, payload=None, max_duration_ms=100):
         self.request_sequence += 1
         request = MotionRequest()
         request.id = f'voice-talk-{now_ms()}-{self.request_sequence}'
         request.action = action
-        request.max_duration_ms = 100
+        request.max_duration_ms = max_duration_ms
         request.payload_json = json.dumps(payload or {})
         self.motion_publisher.publish(request)
 
@@ -132,6 +139,10 @@ class VoiceGestureBridge(Node):
             self.gesture_active = True
             self.frame_index = 0
             self.next_frame_at = now
+            self.scheduled_wheel_actions = [
+                (now + self.WHEEL_FORWARD_DELAY_S, 'forward'),
+                (now + self.WHEEL_BACKWARD_DELAY_S, 'backward'),
+            ]
         self.gesture_deadline = max(self.gesture_deadline, deadline)
         self.status_publisher.publish(status(
             'voice_gesture_bridge', 'gesture_requested', f'{duration_ms} ms',
@@ -149,16 +160,31 @@ class VoiceGestureBridge(Node):
 
         now = time.monotonic()
         if now >= self.gesture_deadline:
+            # La parada no mueve servos y evita que una anomalía del puente H
+            # deje las ruedas activas al terminar el gesto.
+            self.publish_request('stop')
             self.publish_request('base_pose')
             self.gesture_active = False
+            self.scheduled_wheel_actions = []
             self.status_publisher.publish(status('voice_gesture_bridge', 'gesture_complete_base'))
             return
+
+        while (
+            self.scheduled_wheel_actions
+            and now >= self.scheduled_wheel_actions[0][0]
+        ):
+            _scheduled_at, action = self.scheduled_wheel_actions.pop(0)
+            self.publish_request(action, max_duration_ms=self.WHEEL_PULSE_MS)
+            self.status_publisher.publish(status(
+                'voice_gesture_bridge', 'wheel_pulse', f'{action} {self.WHEEL_PULSE_MS} ms',
+            ))
 
         if now >= self.next_frame_at:
             self.next_frame_at = now + self.publish_frame()
 
     def destroy_node(self):
         if self.gesture_active:
+            self.publish_request('stop')
             self.publish_request('base_pose')
         if self.server:
             self.server.shutdown()
