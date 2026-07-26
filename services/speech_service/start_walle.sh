@@ -46,5 +46,8 @@ configure_pulse_device() {
 configure_pulse_device "sources" "${MIMIX_AUDIO_INPUT_SOURCE:-}" "set-default-source"
 configure_pulse_device "sinks" "${MIMIX_AUDIO_OUTPUT_SINK:-}" "set-default-sink"
 
+echo "Aplicando configuracion de Wall-E sin interrupciones..."
+"$PYTHON_BIN" "$SERVICE_DIR/sync_elevenlabs_prompt.py" --env-file "$ENV_FILE"
+
 echo "Iniciando Wall-E. Presiona Ctrl+C para detenerlo."
 exec "$PYTHON_BIN" "$SERVICE_DIR/elevenlabs_service.py"

@@ -64,9 +64,12 @@ class DialogueManagerTests(unittest.TestCase):
 
 
 class ElevenLabsPromptPayloadTests(unittest.TestCase):
-    def test_payload_preserves_registered_tool_ids(self) -> None:
+    def test_payload_preserves_registered_tool_ids_and_disables_interruptions(self) -> None:
         current_agent = {
             "conversation_config": {
+                "conversation": {
+                    "client_events": ["audio", "interruption", "agent_response"],
+                },
                 "agent": {
                     "prompt": {
                         "prompt": "previous prompt",
@@ -78,12 +81,29 @@ class ElevenLabsPromptPayloadTests(unittest.TestCase):
 
         payload = build_payload(current_agent, "new prompt")
         prompt = payload["conversation_config"]["agent"]["prompt"]
+        client_events = payload["conversation_config"]["conversation"]["client_events"]
 
         self.assertEqual(prompt["prompt"], "new prompt")
         self.assertTrue(prompt["ignore_default_personality"])
         self.assertEqual(
             prompt["tool_ids"],
             ["tool_context", "tool_navigate", "tool_dialogue"],
+        )
+        self.assertEqual(client_events, ["audio", "agent_response"])
+
+    def test_payload_keeps_other_events_when_interruption_was_already_disabled(self) -> None:
+        current_agent = {
+            "conversation_config": {
+                "conversation": {"client_events": ["audio"]},
+                "agent": {"prompt": {"prompt": "previous prompt"}},
+            }
+        }
+
+        payload = build_payload(current_agent, "new prompt")
+
+        self.assertEqual(
+            payload["conversation_config"]["conversation"]["client_events"],
+            ["audio"],
         )
 
 

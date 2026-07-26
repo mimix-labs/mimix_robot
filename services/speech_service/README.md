@@ -63,8 +63,9 @@ python services/speech_service/sync_elevenlabs_prompt.py
 ```
 
 El sincronizador obtiene la configuración actual, conserva sus IDs de
-herramientas Client y actualiza únicamente el prompt. La clave de API nunca se
-copia en el navegador ni en Git.
+herramientas Client, actualiza el prompt y desactiva el evento de interrupción.
+Así Wall-E termina cada diálogo antes de volver a escuchar al estudiante. La
+clave de API nunca se copia en el navegador ni en Git.
 
 ## Arranque en Jetson
 
@@ -111,7 +112,8 @@ pactl list short sinks
 ```
 
 Luego inicia el servicio con un único comando. El lanzador carga `.env`,
-selecciona los dispositivos configurados y arranca Wall-E:
+selecciona los dispositivos configurados, sincroniza la configuración sin
+interrupciones y arranca Wall-E:
 
 ```bash
 cd ~/mimix_robot

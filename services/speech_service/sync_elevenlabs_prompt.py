@@ -62,7 +62,32 @@ def build_payload(current_agent: Mapping[str, object], prompt: str) -> dict[str,
     prompt_config = dict(current_prompt)
     prompt_config["prompt"] = prompt
     prompt_config["ignore_default_personality"] = True
-    return {"conversation_config": {"agent": {"prompt": prompt_config}}}
+
+    if not isinstance(conversation_config, dict):
+        raise ValueError("La configuracion de conversacion no es un objeto JSON.")
+
+    current_conversation = conversation_config.get("conversation", {})
+    if current_conversation is None:
+        current_conversation = {}
+    if not isinstance(current_conversation, dict):
+        raise ValueError("La configuracion de eventos de cliente no es un objeto JSON.")
+
+    current_events = current_conversation.get("client_events", ["audio"])
+    if not isinstance(current_events, list) or not all(
+        isinstance(event, str) for event in current_events
+    ):
+        raise ValueError("La lista de eventos de cliente no es valida.")
+
+    # ElevenLabs solo permite cortar la voz si este evento esta seleccionado.
+    # Al quitarlo, el audio durante una respuesta no abre un turno nuevo.
+    client_events = [event for event in current_events if event != "interruption"]
+
+    return {
+        "conversation_config": {
+            "agent": {"prompt": prompt_config},
+            "conversation": {"client_events": client_events},
+        }
+    }
 
 
 def request_json(
@@ -108,11 +133,14 @@ def main() -> None:
     payload = build_payload(current_agent, prompt)
 
     if arguments.dry_run:
-        print(f"Validado: se actualizaría el prompt del agente {agent_id} sin modificar sus herramientas.")
+        print(
+            "Validado: se actualizarían el prompt y la configuración sin "
+            f"interrupciones del agente {agent_id}, sin modificar sus herramientas."
+        )
         return
 
     request_json(url, api_key, "PATCH", payload)
-    print(f"Prompt publicado en ElevenLabs para el agente {agent_id}.")
+    print(f"Agente Wall-E publicado sin interrupciones en ElevenLabs: {agent_id}.")
 
 
 if __name__ == "__main__":
