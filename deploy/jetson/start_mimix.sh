@@ -19,14 +19,17 @@ usage() {
   cat <<'EOF'
 Uso: bash deploy/jetson/start_mimix.sh [--voice] [--ros] [--physical] [--no-browser] [--skip-ros-build]
 
-  --voice           Inicia el guía Wall-E.
+  --voice           Inicia el guía Wall-E junto con el stack (uso excepcional).
   --ros             Inicia ROS en modo seguro (dry_run=true, desarmado).
-  --physical        Inicia voz y ROS físico, arma el robot y habilita los gestos.
+  --physical        Inicia Web, visión y ROS físico; no abre ElevenLabs.
   --no-browser      No abre Chromium; útil para diagnóstico remoto.
   --skip-ros-build  No reconstruye el workspace ROS antes de iniciarlo.
 
-Para una demostración física completa:
+Para preparar el robot sin abrir una sesión de ElevenLabs:
   bash deploy/jetson/start_mimix.sh --physical
+
+Para abrir voz solo al comenzar la conversación:
+  bash deploy/jetson/start_voice.sh
 EOF
 }
 
@@ -35,7 +38,6 @@ for argument in "$@"; do
     --voice) START_VOICE=true ;;
     --ros) START_ROS=true ;;
     --physical)
-      START_VOICE=true
       START_ROS=true
       PHYSICAL_MODE=true
       ;;
@@ -332,7 +334,8 @@ if [[ "$START_VOICE" == true ]]; then
 fi
 
 if [[ "$PHYSICAL_MODE" == true ]]; then
-  echo "Mimix está listo: voz y gestos físicos activos. Presiona Ctrl+C para detenerlo."
+  echo "Mimix está listo: Web, visión y gestos físicos activos; la voz está detenida."
+  echo "Cuando vayas a conversar, ejecuta: bash deploy/jetson/start_voice.sh"
 elif [[ "$START_ROS" == true ]]; then
   echo "Mimix está listo: ROS activo en simulación segura (dry_run=true, desarmado)."
 else

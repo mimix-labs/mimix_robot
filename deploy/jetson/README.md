@@ -11,8 +11,8 @@ hay varias C3 o se quiere fijar un puerto, configurarlo en
 MIMIX_SERIAL_PORT=/dev/serial/by-id/REEMPLAZAR_POR_EL_ESP32
 ```
 
-Después, el arranque completo —Web, visión, Chromium, ROS, voz y gestos— usa
-una sola terminal y un solo comando:
+El primer comando prepara Web, visión, Chromium, ROS y gestos físicos, sin
+abrir una sesión de ElevenLabs:
 
 ```bash
 cd ~/mimix_robot
@@ -20,16 +20,28 @@ bash deploy/jetson/start_mimix.sh --physical
 ```
 
 `--physical` reconstruye ROS, inicia el puente de gestos, conecta el ESP32 con
-`dry_run=false`, arma la seguridad y recién después inicia Wall-E. Si falta el
-puerto serial o el puerto local `8092` ya está ocupado, el lanzador se detiene
-sin mover el robot y explica cómo corregirlo. No carga firmware.
+`dry_run=false` y arma la seguridad. Si falta el puerto serial o el puerto
+local `8092` ya está ocupado, el lanzador se detiene sin mover el robot y
+explica cómo corregirlo. No carga firmware.
 
-La visión se inicia en segundo plano, pero no bloquea la voz, ROS ni la Web.
+Cuando vaya a empezar la conversación, abrir la voz en otra terminal:
+
+```bash
+cd ~/mimix_robot
+bash deploy/jetson/start_voice.sh
+```
+
+Este segundo comando es el único que abre una sesión de ElevenLabs y consume
+la cuota del agente. Al terminar, detenerlo con `Ctrl+C`; Web, cámara y ROS
+siguen activos.
+
+La visión se inicia en segundo plano, pero no bloquea ROS ni la Web.
 Si la cámara no publica frames, Chromium abre `http://127.0.0.1:5173/` en modo
 normal y el problema queda registrado en `logs/jetson/vision.log`.
 
-`--ros` inicia ROS en simulación segura y desarmada. `--voice` inicia solo la
-voz. Usa `--no-browser` al ejecutarlo por SSH o para diagnóstico remoto, y
+`--ros` inicia ROS en simulación segura y desarmada. `--voice` inicia voz junto
+con el stack, pero para una demostración física se recomienda `start_voice.sh`.
+Usa `--no-browser` al ejecutarlo por SSH o para diagnóstico remoto, y
 `--skip-ros-build` en reinicios posteriores cuando el workspace no cambió. Los
 registros quedan en `~/mimix_robot/logs/jetson/`; `Ctrl+C` detiene todos los
 procesos que inició el lanzador.
