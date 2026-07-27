@@ -45,8 +45,9 @@ Para entrar desde el mundo 3D de Mimix, abrir:
 http://localhost:5173/?vision=robot
 ```
 
-Las zonas de MatemÃ¡ticas y Ciencias conservan automÃ¡ticamente `vision=robot`.
-Si se necesita ir a un reto para depurar, tambiÃ©n se puede abrir directamente:
+Con `vision_service.py` activo, los retos detectan automÃ¡ticamente la Jetson;
+no es necesario agregar `vision=robot`. Ese parÃ¡metro queda disponible solo
+para forzar el modo al depurar. TambiÃ©n se puede abrir un reto directamente:
 
 ```text
 http://localhost:5173/challenges/mathematics/index.html?vision=robot
